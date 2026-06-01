@@ -481,9 +481,7 @@ const DateTimePicker = ({
 
   const inputDisplay = open
     ? inputText
-    : committedDayjs
-      ? committedDayjs.format(FORMAT_FULL)
-      : '';
+    : (committedDayjs?.format(FORMAT_FULL) ?? '');
 
   const showClear = !disabled && (!!committedDayjs || !!pendingDate);
 

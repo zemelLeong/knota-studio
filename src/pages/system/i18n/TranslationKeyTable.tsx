@@ -804,8 +804,8 @@ export default function TranslationKeyTable({
                               )}
                             </td>
                             <td className="max-w-[200px] truncate px-2 py-2">
-                              {record.entryId ? (
-                                record.entryDescription ? (
+                              {record.entryId &&
+                                (record.entryDescription ? (
                                   <span className="text-muted-foreground">
                                     {record.entryDescription}
                                   </span>
@@ -816,8 +816,7 @@ export default function TranslationKeyTable({
                                       '无描述',
                                     )}
                                   </span>
-                                )
-                              ) : null}
+                                ))}
                             </td>
                             <td className="w-32 px-2 py-2">
                               {record.entryLastSeenAt && (

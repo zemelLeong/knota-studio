@@ -26,6 +26,7 @@
       "style": {
         "useConst": "error",
         "useForOf": "error",
+        "noNestedTernary": "error",
         "useNamingConvention": {
           "level": "error",
           "options": {

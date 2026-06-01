@@ -278,6 +278,22 @@ function DataTableImpl<TData, TValue>({
                     const showTooltip =
                       ellipsis && (meta?.showOverflowTooltip ?? false);
                     const isFirstCell = cellIndex === 0;
+                    const whitespaceClass = ellipsis
+                      ? cn(
+                          'whitespace-nowrap',
+                          isPinned ? 'overflow-visible' : 'overflow-hidden',
+                        )
+                      : 'whitespace-normal';
+                    const cellContent = ellipsis ? (
+                      <OverflowCell enableTooltip={showTooltip}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </OverflowCell>
+                    ) : (
+                      flexRender(cell.column.columnDef.cell, cell.getContext())
+                    );
 
                     return (
                       <td
@@ -286,11 +302,7 @@ function DataTableImpl<TData, TValue>({
                           'p-2 align-middle',
                           cellAlignClass[align],
                           isPinned ? 'data-table-cell-pinned' : '',
-                          isPinned && ellipsis
-                            ? 'whitespace-nowrap overflow-visible'
-                            : !isPinned && ellipsis
-                              ? 'whitespace-nowrap overflow-hidden'
-                              : 'whitespace-normal',
+                          whitespaceClass,
                         )}
                         style={{
                           ...getPinningStyles(cell.column),
@@ -325,33 +337,11 @@ function DataTableImpl<TData, TValue>({
                               </button>
                             )}
                             <span className="min-w-0 flex-1">
-                              {ellipsis ? (
-                                <OverflowCell enableTooltip={showTooltip}>
-                                  {flexRender(
-                                    cell.column.columnDef.cell,
-                                    cell.getContext(),
-                                  )}
-                                </OverflowCell>
-                              ) : (
-                                flexRender(
-                                  cell.column.columnDef.cell,
-                                  cell.getContext(),
-                                )
-                              )}
+                              {cellContent}
                             </span>
                           </div>
-                        ) : ellipsis ? (
-                          <OverflowCell enableTooltip={showTooltip}>
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext(),
-                            )}
-                          </OverflowCell>
                         ) : (
-                          flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )
+                          cellContent
                         )}
                         {isPinned && (
                           <PinGradient

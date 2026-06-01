@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -123,6 +124,60 @@ const GrantTenantsDialog = ({
     tenantOptions.every((t) => checkedIds.has(t.id));
   const someChecked =
     !allChecked && tenantOptions.some((t) => checkedIds.has(t.id));
+  let allCheckedState: boolean | 'indeterminate' = false;
+  if (allChecked) {
+    allCheckedState = true;
+  } else if (someChecked) {
+    allCheckedState = 'indeterminate';
+  }
+
+  let content: ReactNode;
+  if (loading) {
+    content = (
+      <p className="text-sm text-muted-foreground">
+        {t('SchedulerMgmt.loading', '加载中...')}
+      </p>
+    );
+  } else if (tenantOptions.length === 0) {
+    content = (
+      <p className="text-sm text-muted-foreground">
+        {t('SchedulerMgmt.noTenants', '暂无可授权的租户')}
+      </p>
+    );
+  } else {
+    content = (
+      <>
+        <div className="flex items-center gap-2 pb-2">
+          <Checkbox checked={allCheckedState} onCheckedChange={toggleAll} />
+          <span className="text-sm font-medium">
+            {t('SchedulerMgmt.selectAll', '全选')}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            ({checkedIds.size}/{tenantOptions.length})
+          </span>
+        </div>
+        <Separator />
+        <div className="space-y-1 pt-1">
+          {tenantOptions.map((tenant) => (
+            // biome-ignore lint/a11y/noLabelWithoutControl: checkbox is inside label
+            <label
+              key={tenant.id}
+              className="flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 hover:bg-accent"
+            >
+              <Checkbox
+                checked={checkedIds.has(tenant.id)}
+                onCheckedChange={() => toggleTenant(tenant.id)}
+              />
+              <span className="text-sm">{tenant.name}</span>
+              <span className="text-xs text-muted-foreground">
+                ({tenant.code})
+              </span>
+            </label>
+          ))}
+        </div>
+      </>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -141,51 +196,7 @@ const GrantTenantsDialog = ({
         </DialogHeader>
 
         <div className="py-4 overflow-y-auto max-h-[55vh] space-y-2">
-          {loading ? (
-            <p className="text-sm text-muted-foreground">
-              {t('SchedulerMgmt.loading', '加载中...')}
-            </p>
-          ) : tenantOptions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {t('SchedulerMgmt.noTenants', '暂无可授权的租户')}
-            </p>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 pb-2">
-                <Checkbox
-                  checked={
-                    allChecked ? true : someChecked ? 'indeterminate' : false
-                  }
-                  onCheckedChange={toggleAll}
-                />
-                <span className="text-sm font-medium">
-                  {t('SchedulerMgmt.selectAll', '全选')}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  ({checkedIds.size}/{tenantOptions.length})
-                </span>
-              </div>
-              <Separator />
-              <div className="space-y-1 pt-1">
-                {tenantOptions.map((tenant) => (
-                  // biome-ignore lint/a11y/noLabelWithoutControl: checkbox is inside label
-                  <label
-                    key={tenant.id}
-                    className="flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 hover:bg-accent"
-                  >
-                    <Checkbox
-                      checked={checkedIds.has(tenant.id)}
-                      onCheckedChange={() => toggleTenant(tenant.id)}
-                    />
-                    <span className="text-sm">{tenant.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      ({tenant.code})
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </>
-          )}
+          {content}
         </div>
 
         <DialogFooter>

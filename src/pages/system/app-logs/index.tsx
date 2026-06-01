@@ -40,6 +40,34 @@ const statusVariants: Record<
   '5xx': 'destructive',
 };
 
+const getStatusRange = (code: number) => {
+  if (code < 300) return '2xx';
+  if (code < 400) return '3xx';
+  if (code < 500) return '4xx';
+  return '5xx';
+};
+
+const getSpanBarColor = ({
+  hasError,
+  hasWarn,
+  hasLogs,
+}: {
+  hasError: boolean;
+  hasWarn: boolean;
+  hasLogs: boolean;
+}) => {
+  if (hasError) {
+    return 'bg-destructive/15 border-destructive/30 text-destructive';
+  }
+  if (hasWarn) {
+    return 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400';
+  }
+  if (hasLogs) {
+    return 'bg-blue-500/15 border-blue-500/30 text-blue-600 dark:text-blue-400';
+  }
+  return 'bg-muted/30 border-border text-muted-foreground';
+};
+
 const levelConfig: Record<
   string,
   { border: string; text: string; bg: string }
@@ -198,15 +226,8 @@ const TraceDetailSheet = ({
               {req.statusCode != null ? (
                 <Badge
                   variant={
-                    statusVariants[
-                      req.statusCode < 300
-                        ? '2xx'
-                        : req.statusCode < 400
-                          ? '3xx'
-                          : req.statusCode < 500
-                            ? '4xx'
-                            : '5xx'
-                    ] ?? 'secondary'
+                    statusVariants[getStatusRange(req.statusCode)] ??
+                    'secondary'
                   }
                   className="text-xs"
                 >
@@ -292,13 +313,11 @@ const TraceDetailSheet = ({
                         (e) => e.level === 'WARN',
                       );
                       const hasLogs = spanEntries.length > 0;
-                      const barColor = hasError
-                        ? 'bg-destructive/15 border-destructive/30 text-destructive'
-                        : hasWarn
-                          ? 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400'
-                          : hasLogs
-                            ? 'bg-blue-500/15 border-blue-500/30 text-blue-600 dark:text-blue-400'
-                            : 'bg-muted/30 border-border text-muted-foreground';
+                      const barColor = getSpanBarColor({
+                        hasError,
+                        hasWarn,
+                        hasLogs,
+                      });
 
                       // Look up raw span for fieldsJson
                       const rawSpan = traceDetail.spans.find(
@@ -572,14 +591,7 @@ const AppLogsPage = () => {
           const code = row.original.statusCode;
           if (code == null)
             return <span className="text-muted-foreground">-</span>;
-          const range =
-            code < 300
-              ? '2xx'
-              : code < 400
-                ? '3xx'
-                : code < 500
-                  ? '4xx'
-                  : '5xx';
+          const range = getStatusRange(code);
           const variant = statusVariants[range] ?? 'secondary';
           return <Badge variant={variant}>{code}</Badge>;
         },

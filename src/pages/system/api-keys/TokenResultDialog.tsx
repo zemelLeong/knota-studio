@@ -28,11 +28,9 @@ const TokenResultDialog = ({
     void navigator.clipboard.writeText(text);
   }, []);
 
-  const exchangeUrl = result?.exchangeUrl?.startsWith('http')
-    ? result.exchangeUrl
-    : result
-      ? `${window.location.origin}${result.exchangeUrl}`
-      : '';
+  const exchangeUrl = result
+    ? new URL(result.exchangeUrl, window.location.origin).toString()
+    : '';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -1,5 +1,6 @@
 import { Icon } from '@iconify/react';
 import { useRequest } from 'ahooks';
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { CheckboxTreeNode } from '@/components/ui/checkbox-tree';
@@ -160,6 +161,31 @@ const MenuAssignDialog = ({
     },
   );
 
+  let content: ReactNode;
+  if (loading) {
+    content = (
+      <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+        {t('RoleMgmt.loading', '加载中...')}
+      </div>
+    );
+  } else if (menuNodes.length === 0) {
+    content = (
+      <p className="p-4 text-sm text-muted-foreground">
+        {t('RoleMgmt.noMenus', '暂无可分配的菜单')}
+      </p>
+    );
+  } else {
+    content = (
+      <CheckboxTree
+        tree={displayTree}
+        checkedKeys={checkedKeys}
+        onCheckedKeysChange={setCheckedKeys}
+        defaultExpandAll={expandAll}
+        checkStrictly
+      />
+    );
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="sm:max-w-xl flex flex-col">
@@ -209,23 +235,7 @@ const MenuAssignDialog = ({
         </div>
 
         <div className="flex-1 overflow-y-auto rounded-md border mx-4 p-2">
-          {loading ? (
-            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-              {t('RoleMgmt.loading', '加载中...')}
-            </div>
-          ) : menuNodes.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">
-              {t('RoleMgmt.noMenus', '暂无可分配的菜单')}
-            </p>
-          ) : (
-            <CheckboxTree
-              tree={displayTree}
-              checkedKeys={checkedKeys}
-              onCheckedKeysChange={setCheckedKeys}
-              defaultExpandAll={expandAll}
-              checkStrictly
-            />
-          )}
+          {content}
         </div>
 
         <SheetFooter>

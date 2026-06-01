@@ -116,11 +116,8 @@ const ProTable = <TData, TValue = unknown>({
     }
     return Array.isArray(reqData) ? reqData : (reqData?.items ?? []);
   }, [isStaticMode, staticData, searchParams, reqData]);
-  const totalItems = isStaticMode
-    ? 0
-    : Array.isArray(reqData)
-      ? 0
-      : (reqData?.totalItems ?? 0);
+  const totalItems =
+    isStaticMode || Array.isArray(reqData) ? 0 : (reqData?.totalItems ?? 0);
 
   return (
     <div className="flex h-full flex-col gap-4">

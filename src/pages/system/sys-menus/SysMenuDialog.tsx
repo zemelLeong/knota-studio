@@ -80,23 +80,44 @@ const SysMenuDialog = ({
     onOpenChange(false);
   };
 
-  const title = isEdit
-    ? t('SysMenuMgmt.dialog.edit', '编辑菜单')
-    : lockedParentRef.current
-      ? t('SysMenuMgmt.dialog.createChild', '为「{name}」添加子菜单').replace(
-          '{name}',
-          lockedParentRef.current.name,
-        )
-      : t('SysMenuMgmt.dialog.create', '新建菜单');
+  const lockedParent = lockedParentRef.current;
+  let title = t('SysMenuMgmt.dialog.create', '新建菜单');
+  if (isEdit) {
+    title = t('SysMenuMgmt.dialog.edit', '编辑菜单');
+  } else if (lockedParent) {
+    title = t(
+      'SysMenuMgmt.dialog.createChild',
+      '为「{name}」添加子菜单',
+    ).replace('{name}', lockedParent.name);
+  }
 
-  const desc = isEdit
-    ? t('SysMenuMgmt.dialog.editDesc', '修改菜单信息')
-    : lockedParentRef.current
-      ? t(
-          'SysMenuMgmt.dialog.createChildDesc',
-          '在「{name}」下创建下级菜单或按钮',
-        ).replace('{name}', lockedParentRef.current.name)
-      : t('SysMenuMgmt.dialog.createDesc', '创建顶层菜单');
+  let desc = t('SysMenuMgmt.dialog.createDesc', '创建顶层菜单');
+  if (isEdit) {
+    desc = t('SysMenuMgmt.dialog.editDesc', '修改菜单信息');
+  } else if (lockedParent) {
+    desc = t(
+      'SysMenuMgmt.dialog.createChildDesc',
+      '在「{name}」下创建下级菜单或按钮',
+    ).replace('{name}', lockedParent.name);
+  }
+
+  let editValues: Record<string, unknown> | undefined;
+  if (isEdit) {
+    editValues = {
+      name: editMenu.name,
+      type: editMenu.type,
+      parentId: editMenu.parentId ?? '',
+      path: editMenu.path ?? '',
+      alias: editMenu.alias ?? '',
+      icon: editMenu.icon ?? '',
+      sortOrder: editMenu.sortOrder,
+      isCache: editMenu.isCache,
+      status: editMenu.status,
+      remark: editMenu.remark ?? '',
+    };
+  } else if (lockedParent) {
+    editValues = { parentId: lockedParent.id };
+  }
 
   return (
     <ProFormDialog
@@ -110,24 +131,7 @@ const SysMenuDialog = ({
       title={title}
       description={desc}
       fields={fields}
-      editValues={
-        isEdit
-          ? {
-              name: editMenu.name,
-              type: editMenu.type,
-              parentId: editMenu.parentId ?? '',
-              path: editMenu.path ?? '',
-              alias: editMenu.alias ?? '',
-              icon: editMenu.icon ?? '',
-              sortOrder: editMenu.sortOrder,
-              isCache: editMenu.isCache,
-              status: editMenu.status,
-              remark: editMenu.remark ?? '',
-            }
-          : lockedParentRef.current
-            ? { parentId: lockedParentRef.current.id }
-            : undefined
-      }
+      editValues={editValues}
       onSubmit={handleSubmit}
     />
   );

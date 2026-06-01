@@ -128,6 +128,36 @@ const triggerTypeVariant = (type: string): 'default' | 'secondary' => {
   }
 };
 
+const getTriggerTypeLabel = (
+  type: string,
+  labels: {
+    triggerManual: string;
+    triggerScheduled: string;
+  },
+) => {
+  if (type === 'manual') return labels.triggerManual;
+  if (type === 'scheduled') return labels.triggerScheduled;
+  return type;
+};
+
+const getExecutionStatusLabel = (
+  status: string,
+  labels: {
+    execPending: string;
+    execRunning: string;
+    execSuccess: string;
+    execFailed: string;
+    execSkipped: string;
+  },
+) => {
+  if (status === 'pending') return labels.execPending;
+  if (status === 'running') return labels.execRunning;
+  if (status === 'success') return labels.execSuccess;
+  if (status === 'failed') return labels.execFailed;
+  if (status === 'skipped') return labels.execSkipped;
+  return status;
+};
+
 // ─── Page ───────────────────────────────────────────────────
 
 type TabKey = 'definitions' | 'schedules' | 'executions';
@@ -448,12 +478,7 @@ const SchedulerPage = () => {
         scheduleName: ({ row }) => row.original.scheduleName || '-',
         triggerType: ({ row }) => {
           const type = row.original.triggerType;
-          const label =
-            type === 'manual'
-              ? labels.triggerManual
-              : type === 'scheduled'
-                ? labels.triggerScheduled
-                : type;
+          const label = getTriggerTypeLabel(type, labels);
           return <Badge variant={triggerTypeVariant(type)}>{label}</Badge>;
         },
         status: ({ row }) => {
@@ -703,11 +728,7 @@ const SchedulerPage = () => {
                   </span>
                   <div>
                     <Badge variant={triggerTypeVariant(execDetail.triggerType)}>
-                      {execDetail.triggerType === 'manual'
-                        ? labels.triggerManual
-                        : execDetail.triggerType === 'scheduled'
-                          ? labels.triggerScheduled
-                          : execDetail.triggerType}
+                      {getTriggerTypeLabel(execDetail.triggerType, labels)}
                     </Badge>
                   </div>
                 </div>
@@ -717,17 +738,7 @@ const SchedulerPage = () => {
                   </span>
                   <div>
                     <Badge variant={executionStatusVariant(execDetail.status)}>
-                      {execDetail.status === 'pending'
-                        ? labels.execPending
-                        : execDetail.status === 'running'
-                          ? labels.execRunning
-                          : execDetail.status === 'success'
-                            ? labels.execSuccess
-                            : execDetail.status === 'failed'
-                              ? labels.execFailed
-                              : execDetail.status === 'skipped'
-                                ? labels.execSkipped
-                                : execDetail.status}
+                      {getExecutionStatusLabel(execDetail.status, labels)}
                     </Badge>
                   </div>
                 </div>

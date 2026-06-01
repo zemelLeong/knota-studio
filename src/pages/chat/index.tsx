@@ -241,12 +241,13 @@ const ToolCallBlock = memo(
     const [expanded, setExpanded] = useState(false);
     const isCompleted = part.status === 'completed';
     const label = labels[part.toolName ?? ''] ?? part.toolName ?? '';
-    const duration =
-      part.durationMs != null
-        ? part.durationMs < 1000
+    let duration: string | undefined;
+    if (part.durationMs != null) {
+      duration =
+        part.durationMs < 1000
           ? `${part.durationMs}ms`
-          : `${(part.durationMs / 1000).toFixed(1)}s`
-        : undefined;
+          : `${(part.durationMs / 1000).toFixed(1)}s`;
+    }
 
     return (
       <div
@@ -914,6 +915,13 @@ const KbChat = () => {
     if (!text || isStreaming) return;
 
     // Build user message
+    let materialType: UiMessage['materialType'];
+    if (inlineText) {
+      materialType = 'inline';
+    } else if (attachedFiles.length > 0) {
+      materialType = 'file';
+    }
+
     const userMsg: UiMessage = {
       key: nextMsgKey(),
       role: 'user',
@@ -921,11 +929,7 @@ const KbChat = () => {
       parts: [],
       loading: false,
       hasMaterial: attachedFiles.length > 0 || !!inlineText,
-      materialType: inlineText
-        ? 'inline'
-        : attachedFiles.length > 0
-          ? 'file'
-          : undefined,
+      materialType,
       fileName: undefined,
       inlineText,
       phase: undefined,
@@ -1040,12 +1044,13 @@ const KbChat = () => {
             t,
           )
             .then((result) => {
-              const output =
-                result.data != null
-                  ? typeof result.data === 'string'
+              let output: string | Record<string, unknown> | undefined;
+              if (result.data != null) {
+                output =
+                  typeof result.data === 'string'
                     ? result.data
-                    : (result.data as Record<string, unknown>)
-                  : undefined;
+                    : (result.data as Record<string, unknown>);
+              }
               return postToolResult({
                 toolCallId: toolCallId,
                 status: result.success ? 'success' : 'error',
@@ -1076,12 +1081,13 @@ const KbChat = () => {
             t,
           )
             .then((result) => {
-              const output =
-                result.data != null
-                  ? typeof result.data === 'string'
+              let output: string | Record<string, unknown> | undefined;
+              if (result.data != null) {
+                output =
+                  typeof result.data === 'string'
                     ? result.data
-                    : (result.data as Record<string, unknown>)
-                  : undefined;
+                    : (result.data as Record<string, unknown>);
+              }
               return postToolResult({
                 toolCallId: toolCallId,
                 status: result.success ? 'success' : 'error',

@@ -320,9 +320,8 @@ function SmartDateInput({
 
   const displayValue = focused
     ? rawText
-    : committedDayjs
-      ? formatParsed(committedDayjs, showTime, showSeconds)
-      : '';
+    : (committedDayjs && formatParsed(committedDayjs, showTime, showSeconds)) ||
+      '';
 
   const showClear = !disabled && !!committedDayjs;
 

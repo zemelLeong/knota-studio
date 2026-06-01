@@ -68,36 +68,35 @@ const handleGetActionDetail = async (
 
   const paramSource = action.formId ? 'form' : 'explicit';
 
-  const fields = action.fields
-    ? action.fields.map((field) => ({
+  let fields: Record<string, unknown>[];
+  if (action.fields) {
+    fields = action.fields.map((field) => ({
+      name: field.name,
+      label: field.label,
+      type: field.type,
+      required: field.required ?? false,
+      ...(field.options ? { options: field.options } : {}),
+    }));
+  } else if (action.formId) {
+    const form = capabilities.forms.find((f) => f.formId === action.formId);
+    fields =
+      form?.fields.map((field) => ({
         name: field.name,
         label: field.label,
         type: field.type,
         required: field.required ?? false,
         ...(field.options ? { options: field.options } : {}),
-      }))
-    : action.formId
-      ? (() => {
-          const form = capabilities.forms.find(
-            (f) => f.formId === action.formId,
-          );
-          if (!form) return [];
-          return form.fields.map((field) => ({
-            name: field.name,
-            label: field.label,
-            type: field.type,
-            required: field.required ?? false,
-            ...(field.options ? { options: field.options } : {}),
-          }));
-        })()
-      : (action.params ?? []).map((param) => ({
-          name: param.name,
-          label: param.label,
-          type: param.type,
-          required: param.required,
-          ...(param.options ? { options: param.options } : {}),
-          ...(param.description ? { description: param.description } : {}),
-        }));
+      })) ?? [];
+  } else {
+    fields = (action.params ?? []).map((param) => ({
+      name: param.name,
+      label: param.label,
+      type: param.type,
+      required: param.required,
+      ...(param.options ? { options: param.options } : {}),
+      ...(param.description ? { description: param.description } : {}),
+    }));
+  }
 
   return {
     success: true,

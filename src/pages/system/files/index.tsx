@@ -255,11 +255,12 @@ const UploadProgressDialog = ({
             );
             const isDone = item.phase === 'done';
             const isError = item.phase === 'error';
-            const barColor = isError
-              ? 'accent-destructive'
-              : isDone
-                ? 'accent-green-500'
-                : 'accent-primary';
+            let barColor = 'accent-primary';
+            if (isError) {
+              barColor = 'accent-destructive';
+            } else if (isDone) {
+              barColor = 'accent-green-500';
+            }
 
             return (
               <div key={item.uid} className="space-y-1">

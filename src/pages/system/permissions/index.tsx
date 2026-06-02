@@ -1,6 +1,6 @@
 import { Icon } from '@iconify/react';
-import { useCallback, useMemo, useState } from 'react';
-import type { ProTableColumnDef } from '@/components/pro-table';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ProTableColumnDef, ProTableRef } from '@/components/pro-table';
 import { buildColumns, ProTable } from '@/components/pro-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,7 +41,7 @@ const PermissionsPage = () => {
 
   const [editPermission, setEditPermission] =
     useState<PermissionResponse | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const tableRef = useRef<ProTableRef>(null);
 
   // Filter states
   const [keyword, setKeyword] = useState('');
@@ -52,7 +52,7 @@ const PermissionsPage = () => {
   const methodOptions = useMemo(() => createMethodFilterOptions(t), [t]);
 
   const triggerRefresh = useCallback(() => {
-    setRefreshKey((prev) => prev + 1);
+    tableRef.current?.refresh();
   }, []);
 
   const handleDelete = useCallback(
@@ -311,10 +311,11 @@ const PermissionsPage = () => {
   return (
     <>
       <ProTable
+        ref={tableRef}
         columns={columns}
         request={handleFetchRequest}
         search={false}
-        params={{ keyword, methodFilter, statusFilter, refreshKey }}
+        params={{ keyword, methodFilter, statusFilter }}
         header={{
           title: t('PermMgmt.title', '权限管理'),
           toolbar: (

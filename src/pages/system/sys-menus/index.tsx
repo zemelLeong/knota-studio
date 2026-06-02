@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import type { ProTableColumnDef } from '@/components/pro-table';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ProTableColumnDef, ProTableRef } from '@/components/pro-table';
 import { buildColumns, ProTable } from '@/components/pro-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,10 +26,10 @@ const SysMenusPage = () => {
   const [parentMenu, setParentMenu] = useState<SysMenuTreeResponse | null>(
     null,
   );
-  const [refreshKey, setRefreshKey] = useState(0);
+  const tableRef = useRef<ProTableRef>(null);
 
   const handleSuccess = useCallback(() => {
-    setRefreshKey((prev) => prev + 1);
+    tableRef.current?.refresh();
   }, []);
 
   const handleDelete = useCallback(
@@ -117,9 +117,9 @@ const SysMenusPage = () => {
   return (
     <>
       <ProTable
+        ref={tableRef}
         columns={columns}
         request={() => getSysMenuTree()}
-        params={{ _ts: refreshKey }}
         header={{
           title: t('SysMenuMgmt.title', '系统菜单管理'),
           toolbar: (

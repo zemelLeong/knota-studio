@@ -38,6 +38,7 @@ export function buildColumns<TData>(
     return {
       accessorKey: opt.key,
       header: opt.label,
+      enableSorting: opt.sortable === true,
       ...(opt.size != null && { size: opt.size }),
       ...(opt.minSize != null && { minSize: opt.minSize }),
       ...(opt.maxSize != null && { maxSize: opt.maxSize }),

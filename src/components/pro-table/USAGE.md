@@ -58,10 +58,10 @@ export function createUserTableColumns(t: TFn): ColumnOption[] {
 
 ```tsx
 // src/pages/system/my-module/index.tsx
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { listUsers } from '@/api/users';
 import { buildColumns, ProTable } from '@/components/pro-table';
-import type { ProTableColumnDef } from '@/components/pro-table';
+import type { ProTableColumnDef, ProTableRef } from '@/components/pro-table';
 import { Button } from '@/components/ui/button';
 import { useT } from '@/i18n';
 import type { UserResponse } from '@/types/user';
@@ -71,12 +71,12 @@ import { UserDialog } from './UserDialog';
 const UsersPage = () => {
   const t = useT();
   const [editUser, setEditUser] = useState<UserResponse | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const tableRef = useRef<ProTableRef>(null);
 
   const userColumns = useMemo(() => createUserTableColumns(t), [t]);
 
   const handleSuccess = useCallback(() => {
-    setRefreshKey((prev) => prev + 1);
+    tableRef.current?.refresh();
   }, []);
 
   const columns = useMemo(
@@ -100,7 +100,7 @@ const UsersPage = () => {
   return (
     <>
       <ProTable
-        key={refreshKey}
+        ref={tableRef}
         columns={columns}
         request={(params) => listUsers(params)}
         header={{
@@ -140,6 +140,22 @@ export default UsersPage;
 | `initialColumnPinning` | `ColumnPinningState?` | — | 列固定（左右固定） |
 | `params` | `Record<string, unknown>?` | — | 额外请求参数（每次请求合并） |
 | `getSubRows` | `(row: TData) => TData[] \| undefined?` | — | 树形数据的子行获取 |
+
+### ProTableRef
+
+`ProTable` 支持通过 ref 暴露刷新方法，适合在弹窗保存成功、批量操作完成后刷新当前表格数据，不需要通过修改 `key` 重建整个表格。
+
+```tsx
+import { useRef } from 'react';
+import { ProTable } from '@/components/pro-table';
+import type { ProTableRef } from '@/components/pro-table';
+
+const tableRef = useRef<ProTableRef>(null);
+
+<ProTable ref={tableRef} columns={columns} request={listUsers} />;
+
+tableRef.current?.refresh();
+```
 
 ### request 签名
 

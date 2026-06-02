@@ -1,27 +1,40 @@
 import { Icon } from '@iconify/react';
-import type { ColumnDef } from '@tanstack/react-table';
+import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import { useRequest } from 'ahooks';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ForwardedRef, ReactElement, RefAttributes } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { DataTable } from '@/components/data-table';
 import { DataTablePagination } from '@/components/data-table/pagination';
 import { Button } from '@/components/ui/button';
 import { DEFAULT_PAGE_SIZE } from '@/types/common';
 import { SearchForm } from './search-form';
-import type { ProTableColumnMeta, ProTableProps } from './types';
+import type { ProTableColumnMeta, ProTableProps, ProTableRef } from './types';
 
 // biome-ignore lint/style/useNamingConvention: TData/TValue are TanStack Table conventions
-const ProTable = <TData, TValue = unknown>({
-  columns,
-  request,
-  data: staticData,
-  header,
-  refreshable,
-  search,
-  pagination,
-  initialColumnPinning,
-  params: extraParams,
-  getSubRows,
-}: ProTableProps<TData, TValue>) => {
+const ProTableImpl = <TData, TValue = unknown>(
+  {
+    columns,
+    request,
+    data: staticData,
+    header,
+    refreshable,
+    search,
+    onSearchValuesChange,
+    pagination,
+    initialColumnPinning,
+    defaultSort,
+    params: extraParams,
+    getSubRows,
+  }: ProTableProps<TData, TValue>,
+  ref: ForwardedRef<ProTableRef>,
+) => {
   const isStaticMode = staticData !== undefined;
 
   const showSearch = search !== false;
@@ -34,6 +47,11 @@ const ProTable = <TData, TValue = unknown>({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
   const [searchParams, setSearchParams] = useState<Record<string, unknown>>({});
+  const [sorting, setSorting] = useState<SortingState>(() =>
+    defaultSort
+      ? [{ id: defaultSort.id, desc: defaultSort.desc ?? false }]
+      : [],
+  );
 
   /** Track previous searchParams to detect changes. */
   const prevSearchRef = useRef(searchParams);
@@ -42,11 +60,16 @@ const ProTable = <TData, TValue = unknown>({
 
   const mergedRequest = useCallback(() => {
     if (isStaticMode) return noopRequest();
+    const activeSort = sorting[0];
     const merged: { page: number; pageSize: number; [key: string]: unknown } = {
       page,
       pageSize,
-      ...searchParams,
       ...extraParams,
+      ...searchParams,
+      ...(activeSort && {
+        sortBy: activeSort.id,
+        sortOrder: activeSort.desc ? 'desc' : 'asc',
+      }),
     };
     if (!request) return noopRequest();
     return request(merged);
@@ -55,6 +78,7 @@ const ProTable = <TData, TValue = unknown>({
     pageSize,
     searchParams,
     extraParams,
+    sorting,
     request,
     isStaticMode,
     noopRequest,
@@ -65,10 +89,22 @@ const ProTable = <TData, TValue = unknown>({
     loading: reqLoading,
     refresh,
   } = useRequest(mergedRequest, {
-    refreshDeps: [page, pageSize, searchParams, extraParams],
+    refreshDeps: [page, pageSize, searchParams, extraParams, sorting],
     manual: isStaticMode,
   });
   const loading = isStaticMode ? false : reqLoading;
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      refresh: () => {
+        if (!isStaticMode) {
+          refresh();
+        }
+      },
+    }),
+    [isStaticMode, refresh],
+  );
 
   const handleSearch = useCallback((values: Record<string, unknown>) => {
     prevSearchRef.current = values;
@@ -81,6 +117,17 @@ const ProTable = <TData, TValue = unknown>({
     setSearchParams({});
     setPage(1);
   }, []);
+
+  const handleSortingChange = useCallback(
+    (updater: SortingState | ((prev: SortingState) => SortingState)) => {
+      setSorting((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        return next.slice(0, 1);
+      });
+      setPage(1);
+    },
+    [],
+  );
 
   const handlePageChange = useCallback((newPage: number) => {
     setPage(newPage);
@@ -153,6 +200,7 @@ const ProTable = <TData, TValue = unknown>({
           resetText={searchConfig?.resetText}
           onSearch={handleSearch}
           onReset={handleReset}
+          onValuesChange={onSearchValuesChange}
         />
       )}
 
@@ -161,6 +209,8 @@ const ProTable = <TData, TValue = unknown>({
           columns={tableColumns}
           data={items}
           loading={loading}
+          sorting={sorting}
+          onSortingChange={handleSortingChange}
           initialColumnPinning={initialColumnPinning}
           getSubRows={getSubRows}
         />
@@ -180,11 +230,17 @@ const ProTable = <TData, TValue = unknown>({
   );
 };
 
+// biome-ignore lint/style/useNamingConvention: TData/TValue are TanStack Table conventions
+const ProTable = forwardRef(ProTableImpl) as <TData, TValue = unknown>(
+  props: ProTableProps<TData, TValue> & RefAttributes<ProTableRef>,
+) => ReactElement;
+
 export { buildColumns, extractFilterFields } from './build-columns';
 export type {
   ColumnOption,
   ProTableColumnDef,
   ProTableColumnMeta,
   ProTableProps,
+  ProTableRef,
 } from './types';
 export { ProTable };

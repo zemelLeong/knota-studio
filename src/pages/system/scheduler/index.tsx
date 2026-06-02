@@ -1,7 +1,7 @@
 import { Icon } from '@iconify/react';
 import { useRequest } from 'ahooks';
-import { useCallback, useMemo, useState } from 'react';
-import type { ProTableColumnDef } from '@/components/pro-table';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ProTableColumnDef, ProTableRef } from '@/components/pro-table';
 import { buildColumns, ProTable } from '@/components/pro-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -175,17 +175,17 @@ const SchedulerPage = () => {
   const [grantDef, setGrantDef] = useState<WorkerDefinitionResponse | null>(
     null,
   );
-  const [defRefreshKey, setDefRefreshKey] = useState(0);
+  const defTableRef = useRef<ProTableRef>(null);
   const [workerDefs, setWorkerDefs] = useState<WorkerDefinitionResponse[]>([]);
 
   // ─── Schedule state ───────────────────────────────────
   const [createScheduleOpen, setCreateScheduleOpen] = useState(false);
   const [editSchedule, setEditSchedule] =
     useState<WorkerScheduleResponse | null>(null);
-  const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
+  const scheduleTableRef = useRef<ProTableRef>(null);
 
   // ─── Execution state ──────────────────────────────────
-  const [execRefreshKey, _setExecRefreshKey] = useState(0);
+  const execTableRef = useRef<ProTableRef>(null);
   const [execDetail, setExecDetail] = useState<WorkerExecutionResponse | null>(
     null,
   );
@@ -208,7 +208,7 @@ const SchedulerPage = () => {
             ? t('SchedulerMgmt.toast.disabled', '已停用')
             : t('SchedulerMgmt.toast.enabled', '已启用'),
         );
-        setDefRefreshKey((k) => k + 1);
+        defTableRef.current?.refresh();
       },
     },
   );
@@ -224,7 +224,7 @@ const SchedulerPage = () => {
             ? t('SchedulerMgmt.toast.disabled', '已停用')
             : t('SchedulerMgmt.toast.enabled', '已启用'),
         );
-        setScheduleRefreshKey((k) => k + 1);
+        scheduleTableRef.current?.refresh();
       },
     },
   );
@@ -237,7 +237,7 @@ const SchedulerPage = () => {
           id: res.executionId,
         }),
       );
-      setScheduleRefreshKey((k) => k + 1);
+      scheduleTableRef.current?.refresh();
     },
   });
 
@@ -245,7 +245,7 @@ const SchedulerPage = () => {
     manual: true,
     onSuccess: () => {
       toast.success(t('SchedulerMgmt.toast.deleted', '删除成功'));
-      setScheduleRefreshKey((k) => k + 1);
+      scheduleTableRef.current?.refresh();
     },
   });
 
@@ -262,15 +262,15 @@ const SchedulerPage = () => {
   // ─── Refresh handlers ─────────────────────────────────
 
   const handleDefSuccess = useCallback(() => {
-    setDefRefreshKey((k) => k + 1);
+    defTableRef.current?.refresh();
   }, []);
 
   const handleScheduleSuccess = useCallback(() => {
-    setScheduleRefreshKey((k) => k + 1);
+    scheduleTableRef.current?.refresh();
   }, []);
 
   const handleGrantSuccess = useCallback(() => {
-    setDefRefreshKey((k) => k + 1);
+    defTableRef.current?.refresh();
   }, []);
 
   // ─── Definition table columns ─────────────────────────
@@ -544,7 +544,7 @@ const SchedulerPage = () => {
 
         <TabsContent value="definitions" className="overflow-hidden">
           <ProTable
-            key={defRefreshKey}
+            ref={defTableRef}
             columns={defColumns}
             request={async () => {
               const data = await listWorkerDefinitions();
@@ -566,7 +566,7 @@ const SchedulerPage = () => {
 
         <TabsContent value="schedules" className="overflow-hidden">
           <ProTable
-            key={scheduleRefreshKey}
+            ref={scheduleTableRef}
             columns={scheduleColumns}
             request={() => listWorkerSchedules()}
             header={{
@@ -584,7 +584,7 @@ const SchedulerPage = () => {
 
         <TabsContent value="executions" className="overflow-hidden">
           <ProTable
-            key={execRefreshKey}
+            ref={execTableRef}
             columns={execColumns}
             request={(params) =>
               listWorkerExecutions({

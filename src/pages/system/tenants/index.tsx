@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import type { ProTableColumnDef } from '@/components/pro-table';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ProTableColumnDef, ProTableRef } from '@/components/pro-table';
 import { buildColumns, ProTable } from '@/components/pro-table';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -20,10 +20,10 @@ const TenantsPage = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTenant, setEditTenant] = useState<TenantResponse | null>(null);
   const [adminTenant, setAdminTenant] = useState<TenantResponse | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const tableRef = useRef<ProTableRef>(null);
 
   const handleSuccess = useCallback(() => {
-    setRefreshKey((prev) => prev + 1);
+    tableRef.current?.refresh();
   }, []);
 
   const handleToggleStatus = useCallback(
@@ -93,7 +93,7 @@ const TenantsPage = () => {
   return (
     <>
       <ProTable
-        key={refreshKey}
+        ref={tableRef}
         columns={columns}
         request={(params) =>
           listTenants({

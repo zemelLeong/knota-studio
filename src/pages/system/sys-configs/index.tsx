@@ -1,6 +1,6 @@
 import { useRequest } from 'ahooks';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ProTableColumnDef } from '@/components/pro-table';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ProTableColumnDef, ProTableRef } from '@/components/pro-table';
 import { buildColumns, ProTable } from '@/components/pro-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -217,10 +217,10 @@ const SysConfigsPage = () => {
   const [editConfig, setEditConfig] = useState<SysConfigResponse | null>(null);
   const [overrideConfig, setOverrideConfig] =
     useState<SysConfigResponse | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const tableRef = useRef<ProTableRef>(null);
 
   const handleSuccess = useCallback(() => {
-    setRefreshKey((prev) => prev + 1);
+    tableRef.current?.refresh();
   }, []);
 
   const handleDelete = useCallback(
@@ -297,7 +297,7 @@ const SysConfigsPage = () => {
   return (
     <>
       <ProTable
-        key={refreshKey}
+        ref={tableRef}
         columns={columns}
         request={(params) =>
           listGlobalConfigs({

@@ -1,7 +1,7 @@
 import { useRequest } from 'ahooks';
 import dayjs from 'dayjs';
-import { useCallback, useMemo, useState } from 'react';
-import type { ProTableColumnDef } from '@/components/pro-table';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ProTableColumnDef, ProTableRef } from '@/components/pro-table';
 import { buildColumns, ProTable } from '@/components/pro-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -61,16 +61,15 @@ const ApiKeysPage = () => {
     useState<CreateExchangeTokenResponse | null>(null);
   const [tokenResultOpen, setTokenResultOpen] = useState(false);
 
-  // Refresh
-  const [keysRefresh, setKeysRefresh] = useState(0);
-  const [tokensRefresh, setTokensRefresh] = useState(0);
+  const keysTableRef = useRef<ProTableRef>(null);
+  const tokensTableRef = useRef<ProTableRef>(null);
 
   const handleKeysSuccess = useCallback(() => {
-    setKeysRefresh((prev) => prev + 1);
+    keysTableRef.current?.refresh();
   }, []);
 
   const handleTokensSuccess = useCallback(() => {
-    setTokensRefresh((prev) => prev + 1);
+    tokensTableRef.current?.refresh();
   }, []);
 
   const handleRevoke = useCallback(
@@ -225,7 +224,7 @@ const ApiKeysPage = () => {
 
         <TabsContent value="keys" className="overflow-hidden">
           <ProTable
-            key={keysRefresh}
+            ref={keysTableRef}
             columns={apiKeyColumns}
             request={(params) =>
               getApiKeys({
@@ -242,7 +241,7 @@ const ApiKeysPage = () => {
 
         <TabsContent value="tokens" className="overflow-hidden">
           <ProTable
-            key={tokensRefresh}
+            ref={tokensTableRef}
             columns={exchangeTokenColumns}
             request={(params) =>
               getExchangeTokens({

@@ -1,6 +1,20 @@
+import { Icon } from '@iconify/react';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -21,6 +35,7 @@ interface SearchFormProps<TData, TValue> {
   resetText?: string;
   onSearch: (values: Record<string, unknown>) => void;
   onReset: () => void;
+  onValuesChange?: (values: Record<string, unknown>) => void;
 }
 
 // biome-ignore lint/style/useNamingConvention: TData/TValue are TanStack Table conventions
@@ -68,6 +83,7 @@ const SearchForm = <TData, TValue>({
   resetText,
   onSearch,
   onReset,
+  onValuesChange,
 }: SearchFormProps<TData, TValue>) => {
   const t = useT();
   const searchLabel = searchText ?? t('Common.query', '查询');
@@ -105,7 +121,11 @@ const SearchForm = <TData, TValue>({
   const showCollapseToggle = searchFields.length > fieldsPerRow;
 
   const handleChange = (key: string, value: unknown) => {
-    setValues((prev) => ({ ...prev, [key]: value }));
+    setValues((prev) => {
+      const next = { ...prev, [key]: value };
+      onValuesChange?.(next);
+      return next;
+    });
   };
 
   const handleSubmit = () => {
@@ -126,6 +146,7 @@ const SearchForm = <TData, TValue>({
 
   const handleReset = () => {
     setValues(initialValues);
+    onValuesChange?.(initialValues);
     onReset();
   };
 
@@ -168,11 +189,12 @@ const SearchForm = <TData, TValue>({
         <Button type="submit" size="sm">
           {searchLabel}
         </Button>
-        <Button size="sm" variant="outline" onClick={handleReset}>
+        <Button type="button" size="sm" variant="outline" onClick={handleReset}>
           {resetLabel}
         </Button>
         {showCollapseToggle && (
           <Button
+            type="button"
             size="sm"
             variant="ghost"
             onClick={() => setCollapsed((prev) => !prev)}
@@ -203,6 +225,18 @@ const SearchField = ({
   const t = useT();
   const type = config.type ?? 'text';
 
+  const getMultiSelectTriggerText = (selectedLabels: string[]) => {
+    if (selectedLabels.length === 0) {
+      return config.placeholder ?? t('Common.select', '请选择');
+    }
+    if (selectedLabels.length === 1) {
+      return selectedLabels[0];
+    }
+    return t('Common.selectedCount', '已选 {{count}} 项', {
+      count: selectedLabels.length,
+    });
+  };
+
   if (type === 'select') {
     return (
       <Select
@@ -226,6 +260,80 @@ const SearchField = ({
           ))}
         </SelectContent>
       </Select>
+    );
+  }
+
+  if (type === 'multiselect') {
+    const selected = Array.isArray(value) ? (value as string[]) : [];
+    const toggle = (item: string) => {
+      onChange(
+        selected.includes(item)
+          ? selected.filter((selectedItem) => selectedItem !== item)
+          : [...selected, item],
+      );
+    };
+    const selectedLabels = selected
+      .map((item) => config.options?.find((opt) => opt.value === item)?.label)
+      .filter((label): label is string => Boolean(label));
+    const triggerText = getMultiSelectTriggerText(selectedLabels);
+
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            className="h-8 w-[220px] justify-between px-3 font-normal"
+          >
+            <span className="truncate text-left">{triggerText}</span>
+            <Icon
+              icon="lucide:chevrons-up-down"
+              className="ml-2 size-3.5 shrink-0 opacity-50"
+            />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[360px] max-w-[90vw] p-0">
+          <Command>
+            <CommandInput
+              placeholder={config.placeholder ?? t('Common.search', '搜索...')}
+            />
+            <CommandList className="max-h-72">
+              <CommandEmpty>{t('Common.noMatch', '无匹配项')}</CommandEmpty>
+              <CommandGroup>
+                {config.options?.map((opt) => {
+                  const checked = selected.includes(opt.value);
+                  return (
+                    <CommandItem
+                      key={opt.value}
+                      value={`${opt.label} ${opt.description ?? ''}`}
+                      disabled={opt.disabled}
+                      onSelect={() => toggle(opt.value)}
+                      className="items-start"
+                    >
+                      <Icon
+                        icon={checked ? 'lucide:check-square' : 'lucide:square'}
+                        className={cn(
+                          'mt-0.5 size-4',
+                          checked ? 'opacity-100' : 'opacity-40',
+                        )}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{opt.label}</span>
+                        {opt.description && (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {opt.description}
+                          </span>
+                        )}
+                      </span>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     );
   }
 

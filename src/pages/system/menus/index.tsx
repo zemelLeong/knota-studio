@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import type { ProTableColumnDef } from '@/components/pro-table';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ProTableColumnDef, ProTableRef } from '@/components/pro-table';
 import { buildColumns, ProTable } from '@/components/pro-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ const MenusPage = () => {
   useMenusAgent();
 
   const [editMenu, setEditMenu] = useState<MergedMenuTreeResponse | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const tableRef = useRef<ProTableRef>(null);
 
   const menuTypeMap = useMemo<
     Record<
@@ -40,7 +40,7 @@ const MenusPage = () => {
   );
 
   const handleSuccess = useCallback(() => {
-    setRefreshKey((prev) => prev + 1);
+    tableRef.current?.refresh();
   }, []);
 
   const handleResetOverride = useCallback(
@@ -93,7 +93,7 @@ const MenusPage = () => {
   return (
     <>
       <ProTable
-        key={refreshKey}
+        ref={tableRef}
         columns={columns}
         request={() => getTenantMenuTree()}
         header={{

@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import type { ProTableColumnDef } from '@/components/pro-table';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ProTableColumnDef, ProTableRef } from '@/components/pro-table';
 import { buildColumns, ProTable } from '@/components/pro-table';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -30,10 +30,10 @@ const RoleTemplatesPage = () => {
     useState<RoleTemplateResponse | null>(null);
   const [assignPermsTemplate, setAssignPermsTemplate] =
     useState<RoleTemplateResponse | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const tableRef = useRef<ProTableRef>(null);
 
   const handleSuccess = useCallback(() => {
-    setRefreshKey((prev) => prev + 1);
+    tableRef.current?.refresh();
   }, []);
 
   const handleDelete = useCallback(
@@ -95,7 +95,7 @@ const RoleTemplatesPage = () => {
   return (
     <>
       <ProTable
-        key={refreshKey}
+        ref={tableRef}
         columns={columns}
         request={() => listRoleTemplates()}
         header={{

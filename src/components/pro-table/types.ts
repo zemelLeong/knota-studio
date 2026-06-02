@@ -94,6 +94,8 @@ export interface ProTableProps<TData, TValue = unknown> {
         searchText?: string;
         resetText?: string;
       };
+  /** Observe raw search form value changes before submit. */
+  onSearchValuesChange?: (values: Record<string, unknown>) => void;
   /** Pagination config. false to hide. */
   pagination?:
     | false
@@ -103,10 +105,20 @@ export interface ProTableProps<TData, TValue = unknown> {
       };
   /** Default column pinning. */
   initialColumnPinning?: ColumnPinningState;
+  /** Initial remote sorting state. */
+  defaultSort?: {
+    id: string;
+    desc?: boolean;
+  };
   /** Extra params merged into every request. */
   params?: Record<string, unknown>;
   /** Optional sub-row accessor for tree/hierarchical tables. */
   getSubRows?: (row: TData) => TData[] | undefined;
+}
+
+export interface ProTableRef {
+  /** Refresh table data with current page, page size, search params, and extra params. */
+  refresh: () => void;
 }
 
 /**

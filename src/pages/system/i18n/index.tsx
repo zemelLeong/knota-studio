@@ -1,7 +1,7 @@
 import { Icon } from '@iconify/react';
 import yaml from 'js-yaml';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ProTableColumnDef } from '@/components/pro-table';
+import type { ProTableColumnDef, ProTableRef } from '@/components/pro-table';
 import { buildColumns, ProTable } from '@/components/pro-table';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -199,7 +199,7 @@ const I18nPage = () => {
   // ── Locales state ──────────────────────────────────────────────
   const [editLocale, setEditLocale] = useState<LocaleAdmin | null>(null);
   const [localeDialogOpen, setLocaleDialogOpen] = useState(false);
-  const [localeRefreshKey, setLocaleRefreshKey] = useState(0);
+  const localeTableRef = useRef<ProTableRef>(null);
 
   // ── Locale list for translation columns ────────────────────────
   // ProTable's request is the sole data fetcher; it also populates
@@ -209,7 +209,7 @@ const I18nPage = () => {
   useI18nAgent(localesData);
 
   const handleLocaleSuccess = useCallback(() => {
-    setLocaleRefreshKey((prev) => prev + 1);
+    localeTableRef.current?.refresh();
   }, []);
 
   // ── Locales tab columns ────────────────────────────────────────
@@ -314,7 +314,7 @@ const I18nPage = () => {
         {TABS.some((t) => t.value === 'locales') && (
           <TabsContent value="locales">
             <ProTable
-              key={`locales-${localeRefreshKey}`}
+              ref={localeTableRef}
               columns={localeColumns}
               request={async () => {
                 const data = await listLocales();

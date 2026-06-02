@@ -3,6 +3,8 @@ import type {
   ColumnDef,
   ColumnMeta,
   ColumnPinningState,
+  OnChangeFn,
+  SortingState,
 } from '@tanstack/react-table';
 import {
   flexRender,
@@ -26,6 +28,8 @@ interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   loading?: boolean;
+  sorting?: SortingState;
+  onSortingChange?: OnChangeFn<SortingState>;
   /** Default pinned columns. e.g. { left: ['name'], right: ['actions'] } */
   initialColumnPinning?: ColumnPinningState;
   /** Optional sub-row accessor for tree/hierarchical tables. */
@@ -54,6 +58,12 @@ const cellAlignClass = {
   center: 'text-center',
   right: 'text-right',
 } as const;
+
+function getSortIcon(sorted: false | 'asc' | 'desc') {
+  if (sorted === 'asc') return 'lucide:arrow-up';
+  if (sorted === 'desc') return 'lucide:arrow-down';
+  return 'lucide:arrow-up-down';
+}
 
 const getPinningStyles = (column: {
   getIsPinned: () => false | 'left' | 'right';
@@ -143,6 +153,8 @@ function DataTableImpl<TData, TValue>({
   columns,
   data,
   loading,
+  sorting,
+  onSortingChange,
   initialColumnPinning,
   getSubRows,
 }: DataTableProps<TData, TValue>) {
@@ -152,6 +164,9 @@ function DataTableImpl<TData, TValue>({
     columns,
     enableColumnResizing: true,
     columnResizeMode: 'onChange',
+    manualSorting: true,
+    state: sorting ? { sorting } : undefined,
+    onSortingChange,
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     getSubRows,
@@ -206,6 +221,8 @@ function DataTableImpl<TData, TValue>({
                     | DataTableMeta
                     | undefined;
                   const align = meta?.align ?? 'left';
+                  const canSort = header.column.getCanSort();
+                  const sorted = header.column.getIsSorted();
 
                   return (
                     <th
@@ -213,17 +230,31 @@ function DataTableImpl<TData, TValue>({
                       className={cn(
                         'sticky top-0 h-10 px-2 align-middle font-medium whitespace-nowrap text-foreground bg-muted',
                         headerAlignClass[align],
+                        canSort && 'cursor-pointer select-none',
                         isPinned
                           ? 'data-table-cell-pinned overflow-visible'
                           : 'overflow-hidden text-ellipsis',
                       )}
                       style={getPinningStyles(header.column)}
+                      onClick={
+                        canSort
+                          ? header.column.getToggleSortingHandler()
+                          : undefined
+                      }
                     >
                       {header.isPlaceholder ? null : (
-                        <span className="block truncate">
-                          {flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
+                        <span className="flex min-w-0 items-center gap-1 truncate">
+                          <span className="truncate">
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                          </span>
+                          {canSort && (
+                            <Icon
+                              icon={getSortIcon(sorted)}
+                              className="size-3 shrink-0 text-muted-foreground"
+                            />
                           )}
                         </span>
                       )}

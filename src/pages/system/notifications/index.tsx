@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import type { ProTableColumnDef } from '@/components/pro-table';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ProTableColumnDef, ProTableRef } from '@/components/pro-table';
 import { buildColumns, ProTable } from '@/components/pro-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,19 +41,19 @@ const NotificationsPage = () => {
   const [activeTab, setActiveTab] = useState<TabValue>('inbox');
 
   // Inbox state
-  const [inboxRefreshKey, setInboxRefreshKey] = useState(0);
+  const inboxTableRef = useRef<ProTableRef>(null);
   const [expandedInboxId, setExpandedInboxId] = useState<string | null>(null);
 
   // Manage state
-  const [manageRefreshKey, setManageRefreshKey] = useState(0);
+  const manageTableRef = useRef<ProTableRef>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const handleInboxRefresh = useCallback(() => {
-    setInboxRefreshKey((prev) => prev + 1);
+    inboxTableRef.current?.refresh();
   }, []);
 
   const handleManageRefresh = useCallback(() => {
-    setManageRefreshKey((prev) => prev + 1);
+    manageTableRef.current?.refresh();
   }, []);
 
   // ── Type badge helper ──────────────────────────────────────────
@@ -286,7 +286,7 @@ const NotificationsPage = () => {
 
         <TabsContent value="inbox" className="overflow-hidden">
           <ProTable
-            key={`inbox-${inboxRefreshKey}`}
+            ref={inboxTableRef}
             columns={inboxColumns}
             request={(params) =>
               getInbox({
@@ -308,7 +308,7 @@ const NotificationsPage = () => {
 
         <TabsContent value="manage" className="overflow-hidden">
           <ProTable
-            key={`manage-${manageRefreshKey}`}
+            ref={manageTableRef}
             columns={manageColumns}
             request={(params) =>
               listNotifications({

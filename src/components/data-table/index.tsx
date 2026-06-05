@@ -53,6 +53,12 @@ const headerAlignClass = {
   right: 'text-right',
 } as const;
 
+const headerContentAlignClass = {
+  left: 'justify-start',
+  center: 'justify-center',
+  right: 'justify-end',
+} as const;
+
 const cellAlignClass = {
   left: 'text-left',
   center: 'text-center',
@@ -243,7 +249,12 @@ function DataTableImpl<TData, TValue>({
                       }
                     >
                       {header.isPlaceholder ? null : (
-                        <span className="flex min-w-0 items-center gap-1 truncate">
+                        <span
+                          className={cn(
+                            'flex min-w-0 items-center gap-1 truncate',
+                            headerContentAlignClass[align],
+                          )}
+                        >
                           <span className="truncate">
                             {flexRender(
                               header.column.columnDef.header,

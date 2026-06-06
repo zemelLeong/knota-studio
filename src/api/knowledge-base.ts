@@ -25,6 +25,41 @@ export interface QaCitation {
   score: number;
 }
 
+// ---- Document Preview Types ----
+
+export interface DocumentAsset {
+  id: string;
+  name: string;
+  mimeType: string;
+  storageKey: string;
+  size: number;
+}
+
+export interface DocumentPreview {
+  documentId: string;
+  title: string;
+  markdown: string;
+  assets: DocumentAsset[];
+}
+
+export interface PresignedDocumentAsset {
+  assetKey: string;
+  url: string;
+  expiresIn: number;
+}
+
+export interface PresignDocumentAssetsResponse {
+  items: PresignedDocumentAsset[];
+}
+
+export const getDocumentPreview = (id: string) =>
+  get<DocumentPreview>(`/kb/documents/${id}/preview`);
+
+export const presignDocumentAssets = (id: string, assetKeys: string[]) =>
+  post<PresignDocumentAssetsResponse>(`/kb/documents/${id}/assets/presign`, {
+    assetKeys,
+  });
+
 // ---- Streaming QA Types ----
 
 export type QaPhase =

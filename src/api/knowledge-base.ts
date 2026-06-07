@@ -1,5 +1,6 @@
 import type { PageContextMinimal, ToolDefinition } from '@/lib/agent';
-import { del, fetchSSE, get, getBlob, post } from './client';
+import type { PaginatedResponse } from '@/types/common';
+import { del, fetchSSE, get, getBlob, post, put } from './client';
 
 // ---- QA Types ----
 
@@ -24,6 +25,117 @@ export interface QaCitation {
   content: string;
   score: number;
 }
+
+// ---- Library / Folder / Document Types ----
+
+export interface KbLibrary {
+  id: string;
+  name: string;
+  description?: string | null;
+  sortOrder: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KbFolder {
+  id: string;
+  libraryId: string;
+  parentId?: string | null;
+  name: string;
+  path: string;
+  depth: number;
+  sortOrder: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KbDocument {
+  id: string;
+  title: string;
+  description?: string | null;
+  libraryId?: string | null;
+  folderId?: string | null;
+  sourceType: string;
+  scope: string;
+  fileId?: string | null;
+  status: string;
+  chunkCount: number;
+  totalTokens: number;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateLibraryRequest {
+  name: string;
+  description?: string | null;
+  sortOrder?: number;
+}
+
+export interface CreateFolderRequest {
+  libraryId: string;
+  parentId?: string | null;
+  name: string;
+  sortOrder?: number;
+}
+
+export interface CreateDocumentRequest {
+  title: string;
+  description?: string | null;
+  libraryId?: string | null;
+  folderId?: string | null;
+  sourceType?: string;
+  scope?: string;
+  fileId?: string;
+  content?: string;
+}
+
+export interface DocumentListParams {
+  page?: number;
+  pageSize?: number;
+  libraryId?: string;
+  folderId?: string;
+  status?: string;
+  scope?: string;
+}
+
+export const listLibraries = () => get<KbLibrary[]>('/kb-libraries');
+
+export const createLibrary = (data: CreateLibraryRequest) =>
+  post<KbLibrary>('/kb-libraries', data);
+
+export const updateLibrary = (id: string, data: CreateLibraryRequest) =>
+  put<KbLibrary>(`/kb-libraries/${id}`, data);
+
+export const deleteLibrary = (id: string) => del(`/kb-libraries/${id}`);
+
+export const listFolders = (params: {
+  libraryId: string;
+  parentId?: string | null;
+}) => get<KbFolder[]>('/kb-folders', { params });
+
+export const createFolder = (data: CreateFolderRequest) =>
+  post<KbFolder>('/kb-folders', data);
+
+export const updateFolder = (
+  id: string,
+  data: Omit<CreateFolderRequest, 'libraryId'>,
+) => put<KbFolder>(`/kb-folders/${id}`, data);
+
+export const deleteFolder = (id: string) => del(`/kb-folders/${id}`);
+
+export const listDocuments = (params: DocumentListParams) =>
+  get<PaginatedResponse<KbDocument>>('/kb-documents', { params });
+
+export const createDocument = (data: CreateDocumentRequest) =>
+  post<KbDocument>('/kb-documents', data);
+
+export const deleteDocument = (id: string) => del(`/kb-documents/${id}`);
+
+export const reindexDocument = (id: string) =>
+  post<{ success: boolean }>(`/kb-documents/${id}/reindex`, {});
 
 // ---- Document Preview Types ----
 

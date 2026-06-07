@@ -18,17 +18,30 @@ import { cn } from '@/lib/utils';
 const pollIntervalMs = 30_000;
 const previewCount = 5;
 
+const isGatewayTimeout = (error: unknown): boolean =>
+  typeof error === 'object' &&
+  error !== null &&
+  'status' in error &&
+  (error as { status?: unknown }).status === 504;
+
 const NotificationBell = () => {
   const t = useT();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [unreadPollingStopped, setUnreadPollingStopped] = useState(false);
 
   const { data: unreadResult, refresh: refreshCount } = useRequest(
     api.getUnreadCount,
     {
       cacheKey: 'notification-unread-count',
-      pollingInterval: pollIntervalMs,
+      ready: !unreadPollingStopped,
+      pollingInterval: unreadPollingStopped ? undefined : pollIntervalMs,
       cacheTime: pollIntervalMs * 2,
+      onError: (error) => {
+        if (isGatewayTimeout(error)) {
+          setUnreadPollingStopped(true);
+        }
+      },
     },
   );
   const unreadCount = unreadResult?.count ?? 0;
@@ -51,19 +64,25 @@ const NotificationBell = () => {
 
   const handleMarkAllRead = useCallback(async () => {
     await api.markAllRead();
-    refreshCount();
+    if (!unreadPollingStopped) {
+      refreshCount();
+    }
     toast.success(t('Notification.Bell.allMarkedRead', '已全部标为已读'));
-  }, [refreshCount, t]);
+  }, [refreshCount, t, unreadPollingStopped]);
 
   const handleClickItem = useCallback(
     (item: api.InboxItemResponse) => {
       if (!item.readAt) {
-        void api.markRead(item.id).then(() => refreshCount());
+        void api.markRead(item.id).then(() => {
+          if (!unreadPollingStopped) {
+            refreshCount();
+          }
+        });
       }
       setOpen(false);
       navigate('/system/notifications');
     },
-    [navigate, refreshCount],
+    [navigate, refreshCount, unreadPollingStopped],
   );
 
   return (

@@ -62,7 +62,9 @@ export const getInbox = (params: {
   get<PaginatedResponse<InboxItemResponse>>('/notifications/inbox', { params });
 
 export const getUnreadCount = () =>
-  get<UnreadCountResponse>('/notifications/unread-count');
+  get<UnreadCountResponse>('/notifications/unread-count', {
+    throwError: true,
+  });
 
 export const markRead = (id: string) =>
   put<{ success: boolean }>(`/notifications/${id}/read`, {});

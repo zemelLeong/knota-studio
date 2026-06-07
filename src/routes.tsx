@@ -125,6 +125,10 @@ const routes: RouteObject[] = [
             element: lazyRoute(() => import('@/pages/system/files')),
           },
           {
+            path: '/knowledge-base',
+            element: lazyRoute(() => import('@/pages/knowledge-base')),
+          },
+          {
             path: '/test/datetime',
             element: lazyRoute(() => import('@/pages/test/datetime')),
           },

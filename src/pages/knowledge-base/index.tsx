@@ -1,9 +1,16 @@
 import { Icon } from '@iconify/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { DataTablePagination } from '@/components/data-table/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { toast } from '@/utils/toast';
@@ -59,6 +66,12 @@ const KnowledgeBasePage = () => {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<DocumentPreview | null>(null);
   const [previewMarkdown, setPreviewMarkdown] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [errorTarget, setErrorTarget] = useState<KbDocument | null>(null);
+  const [documentPage, setDocumentPage] = useState(1);
+  const [documentPageSize, setDocumentPageSize] = useState(30);
+  const [documentTotal, setDocumentTotal] = useState(0);
 
   const folderChildren = useMemo(() => {
     const map = new Map<string, KbFolder[]>();
@@ -111,24 +124,37 @@ const KnowledgeBasePage = () => {
     setFolders(all);
   }, []);
 
-  const loadDocuments = useCallback(async () => {
-    if (!selection) {
-      setDocuments([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      const data = await listDocuments({
-        page: 1,
-        pageSize: 100,
-        libraryId: selection.libraryId,
-        folderId: selection.folderId,
-      });
-      setDocuments(data.items);
-    } finally {
-      setLoading(false);
-    }
-  }, [selection]);
+  const hasIndexingDocuments = useMemo(
+    () =>
+      documents.some((document) =>
+        ['pending', 'indexing'].includes(document.status),
+      ),
+    [documents],
+  );
+
+  const loadDocuments = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!selection) {
+        setDocuments([]);
+        setDocumentTotal(0);
+        return;
+      }
+      if (!options?.silent) setLoading(true);
+      try {
+        const data = await listDocuments({
+          page: documentPage,
+          pageSize: documentPageSize,
+          libraryId: selection.libraryId,
+          folderId: selection.folderId,
+        });
+        setDocuments(data.items);
+        setDocumentTotal(data.totalItems);
+      } finally {
+        if (!options?.silent) setLoading(false);
+      }
+    },
+    [documentPage, documentPageSize, selection],
+  );
 
   useEffect(() => {
     void loadLibraries();
@@ -146,6 +172,14 @@ const KnowledgeBasePage = () => {
     void loadDocuments();
   }, [loadDocuments]);
 
+  useEffect(() => {
+    if (!hasIndexingDocuments) return;
+    const timer = window.setInterval(() => {
+      void loadDocuments({ silent: true });
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [hasIndexingDocuments, loadDocuments]);
+
   const refreshAll = useCallback(async () => {
     await loadLibraries();
     if (selection?.libraryId) await loadFolders(selection.libraryId);
@@ -159,6 +193,7 @@ const KnowledgeBasePage = () => {
     setLibraryName('');
     toast.success('知识库已创建');
     await loadLibraries();
+    setDocumentPage(1);
     setSelection({ type: 'library', libraryId: library.id });
   }, [libraryName, loadLibraries]);
 
@@ -195,30 +230,47 @@ const KnowledgeBasePage = () => {
           });
         }
         toast.success('已提交入库任务');
-        await loadDocuments();
+        setDocumentPage(1);
+        if (documentPage === 1) await loadDocuments();
       } finally {
         setUploading(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     },
-    [loadDocuments, selection],
+    [documentPage, loadDocuments, selection],
   );
 
   const handlePreview = useCallback(async (document: KbDocument) => {
-    const data = await getDocumentPreview(document.id);
-    setPreview(data);
-    if (data.assets.length === 0) {
-      setPreviewMarkdown(data.markdown);
-      return;
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreviewMarkdown('');
+    setPreview({
+      documentId: document.id,
+      title: document.title,
+      markdown: '',
+      assets: [],
+    });
+    try {
+      const data = await getDocumentPreview(document.id);
+      setPreview(data);
+      if (data.assets.length === 0) {
+        setPreviewMarkdown(data.markdown);
+        return;
+      }
+      const signed = await presignDocumentAssets(
+        document.id,
+        data.assets.map((asset) => asset.storageKey),
+      );
+      const replacements = new Map(
+        signed.items.map((item) => [item.assetKey, item.url]),
+      );
+      setPreviewMarkdown(replaceAssetUrls(data.markdown, replacements));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setPreviewError(message);
+    } finally {
+      setPreviewLoading(false);
     }
-    const signed = await presignDocumentAssets(
-      document.id,
-      data.assets.map((asset) => asset.storageKey),
-    );
-    const replacements = new Map(
-      signed.items.map((item) => [item.assetKey, item.url]),
-    );
-    setPreviewMarkdown(replaceAssetUrls(data.markdown, replacements));
   }, []);
 
   const handleDeleteDocument = useCallback(
@@ -257,13 +309,14 @@ const KnowledgeBasePage = () => {
               variant={selected ? 'secondary' : 'ghost'}
               size="sm"
               className="min-w-0 flex-1 justify-start"
-              onClick={() =>
+              onClick={() => {
+                setDocumentPage(1);
                 setSelection({
                   type: 'folder',
                   libraryId: folder.libraryId,
                   folderId: folder.id,
-                })
-              }
+                });
+              }}
             >
               <Icon icon="lucide:folder" className="mr-2 size-4 shrink-0" />
               <span className="truncate">{folder.name}</span>
@@ -322,12 +375,13 @@ const KnowledgeBasePage = () => {
                       variant={selected ? 'secondary' : 'ghost'}
                       size="sm"
                       className="w-full justify-start"
-                      onClick={() =>
+                      onClick={() => {
+                        setDocumentPage(1);
                         setSelection({
                           type: 'library',
                           libraryId: library.id,
-                        })
-                      }
+                        });
+                      }}
                     >
                       <Icon
                         icon="lucide:library"
@@ -378,8 +432,15 @@ const KnowledgeBasePage = () => {
                   size="sm"
                   onClick={() => void refreshAll()}
                 >
-                  <Icon icon="lucide:refresh-cw" className="mr-2 size-4" />
-                  刷新
+                  <Icon
+                    icon="lucide:refresh-cw"
+                    className={
+                      hasIndexingDocuments
+                        ? 'mr-2 size-4 animate-spin'
+                        : 'mr-2 size-4'
+                    }
+                  />
+                  {hasIndexingDocuments ? '刷新中' : '刷新'}
                 </Button>
                 <Button
                   type="button"
@@ -428,9 +489,13 @@ const KnowledgeBasePage = () => {
                               {document.title}
                             </div>
                             {document.errorMessage && (
-                              <div className="truncate text-xs text-destructive">
+                              <button
+                                type="button"
+                                className="block max-w-full truncate text-left text-xs text-destructive underline-offset-2 hover:underline"
+                                onClick={() => setErrorTarget(document)}
+                              >
                                 {document.errorMessage}
-                              </div>
+                              </button>
                             )}
                           </div>
                         </div>
@@ -450,6 +515,7 @@ const KnowledgeBasePage = () => {
                             type="button"
                             variant="ghost"
                             size="xs"
+                            disabled={document.status !== 'ready'}
                             onClick={() => void handlePreview(document)}
                           >
                             预览
@@ -487,23 +553,71 @@ const KnowledgeBasePage = () => {
                 </tbody>
               </table>
             </div>
+            {documentTotal > 0 && (
+              <DataTablePagination
+                page={documentPage}
+                pageSize={documentPageSize}
+                totalItems={documentTotal}
+                onPageChange={setDocumentPage}
+                onPageSizeChange={(nextPageSize) => {
+                  setDocumentPageSize(nextPageSize);
+                  setDocumentPage(1);
+                }}
+              />
+            )}
           </CardContent>
         </Card>
 
         {preview && (
           <Card className="min-h-0 flex-1">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">{preview.title}</CardTitle>
+              <CardTitle className="flex items-center justify-between gap-3 text-base">
+                <span className="truncate">{preview.title}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => {
+                    setPreview(null);
+                    setPreviewMarkdown('');
+                    setPreviewError(null);
+                  }}
+                >
+                  <Icon icon="lucide:x" className="size-4" />
+                </Button>
+              </CardTitle>
             </CardHeader>
             <CardContent className="min-h-0">
               <Separator className="mb-4" />
               <div className="prose prose-sm max-h-[48vh] max-w-none overflow-y-auto dark:prose-invert">
-                <ReactMarkdown>{previewMarkdown}</ReactMarkdown>
+                {previewLoading && <p>加载中</p>}
+                {previewError && (
+                  <p className="text-destructive">{previewError}</p>
+                )}
+                {!previewLoading && !previewError && (
+                  <ReactMarkdown>{previewMarkdown}</ReactMarkdown>
+                )}
               </div>
             </CardContent>
           </Card>
         )}
       </main>
+
+      <Dialog
+        open={!!errorTarget}
+        onOpenChange={(open) => {
+          if (!open) setErrorTarget(null);
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{errorTarget?.title ?? '错误详情'}</DialogTitle>
+          </DialogHeader>
+          <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm text-destructive">
+            {errorTarget?.errorMessage}
+          </pre>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

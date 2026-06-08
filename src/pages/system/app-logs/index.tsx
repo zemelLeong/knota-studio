@@ -105,6 +105,30 @@ function parseFields(
   return fieldsJson;
 }
 
+function normalizeLogFields(fields: Record<string, string>) {
+  const displayFields: Record<string, string> = { ...fields };
+  const location =
+    displayFields.location ??
+    (displayFields.file && displayFields.line
+      ? `${displayFields.file}:${displayFields.line}${
+          displayFields.column ? `:${displayFields.column}` : ''
+        }`
+      : undefined);
+
+  delete displayFields.caller_file;
+  delete displayFields.caller_line;
+  delete displayFields.caller_column;
+  delete displayFields.file;
+  delete displayFields.line;
+  delete displayFields.column;
+  delete displayFields.location;
+
+  if (location) {
+    return { location, fields: displayFields };
+  }
+  return { location: null, fields: displayFields };
+}
+
 // ─── Flatten span tree for Gantt chart ──────────────────────────
 
 interface FlatSpan {
@@ -476,7 +500,9 @@ const TraceDetailSheet = ({
                       const cfg =
                         levelConfig[entry.level.toLowerCase()] ??
                         levelConfig.info;
-                      const fields = parseFields(entry.fieldsJson);
+                      const { location, fields } = normalizeLogFields(
+                        parseFields(entry.fieldsJson),
+                      );
                       const isWarn = entry.level === 'WARN';
 
                       return (
@@ -506,6 +532,11 @@ const TraceDetailSheet = ({
                             {entry.target && (
                               <span className="text-slate-400">
                                 {entry.target}
+                              </span>
+                            )}
+                            {location && (
+                              <span className="text-emerald-400">
+                                {location}
                               </span>
                             )}
                           </div>

@@ -226,10 +226,12 @@ export const AiMessage = memo(
     msg,
     t,
     labels,
+    onOpenCitation,
   }: {
     msg: UiMessage;
     t: (key: string, fallback: string) => string;
     labels: Record<string, string>;
+    onOpenCitation?: (citation: UiMessage['citations'][number]) => void;
   }) => (
     <div className="flex gap-3 items-start mb-3">
       <div className="size-6.5 rounded-md bg-linear-to-br from-teal-500 to-teal-600 grid place-items-center shrink-0 mt-0.5">
@@ -309,6 +311,27 @@ export const AiMessage = memo(
                           </div>
                         )}
                       </div>
+                      {onOpenCitation && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+                              onClick={() => onOpenCitation(citation)}
+                            >
+                              <Icon
+                                icon="lucide:external-link"
+                                className="size-3.5"
+                              />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left">
+                            {t('KbChat.citations.openPreview', '打开文档预览')}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-muted-foreground">
                       <span className="inline-flex items-center gap-1 rounded bg-teal-50 px-1.5 py-0.5 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300">

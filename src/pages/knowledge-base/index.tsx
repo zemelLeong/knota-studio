@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react';
 import { useRequest } from 'ahooks';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { useLocation, useNavigate } from 'react-router-dom';
 import remarkGfm from 'remark-gfm';
 import { DataTablePagination } from '@/components/data-table/pagination';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +40,24 @@ import {
 type Selection =
   | { type: 'library'; libraryId: string; folderId?: undefined }
   | { type: 'folder'; libraryId: string; folderId: string };
+
+type PreviewDocumentInput = Pick<KbDocument, 'id' | 'title'>;
+
+interface PreviewLineTarget {
+  startLine: number;
+  endLine: number;
+}
+
+interface PreviewRequest {
+  document: PreviewDocumentInput;
+  lineTarget?: PreviewLineTarget | null;
+}
+
+interface PreviewResult {
+  data: DocumentPreview;
+  markdown: string;
+  lineTarget: PreviewLineTarget | null;
+}
 
 const assetUrlPattern = /kb-asset:\/\/([^)]+)/g;
 
@@ -163,17 +182,46 @@ const replaceAssetUrls = (
     (_, key: string) => replacements.get(key) ?? `kb-asset://${key}`,
   );
 
+const parsePositiveInt = (value: string | null) => {
+  if (!value) return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+};
+
+const buildLineExcerpt = (
+  markdown: string,
+  target: PreviewLineTarget | null,
+) => {
+  if (!target) return [];
+  const lines = markdown.split(/\r?\n/);
+  const startLine = Math.max(1, target.startLine);
+  const endLine = Math.max(startLine, target.endLine);
+  const before = Math.max(1, startLine - 3);
+  const after = Math.min(lines.length, endLine + 3);
+
+  return lines.slice(before - 1, after).map((text, index) => {
+    const lineNumber = before + index;
+    return {
+      lineNumber,
+      text,
+      active: lineNumber >= startLine && lineNumber <= endLine,
+    };
+  });
+};
+
 const KnowledgeBasePage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [libraries, setLibraries] = useState<KbLibrary[]>([]);
   const [folders, setFolders] = useState<KbFolder[]>([]);
   const [documents, setDocuments] = useState<KbDocument[]>([]);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [libraryName, setLibraryName] = useState('');
   const [folderName, setFolderName] = useState('');
-  const [preview, setPreview] = useState<DocumentPreview | null>(null);
-  const [previewMarkdown, setPreviewMarkdown] = useState('');
-  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewRequest, setPreviewRequest] = useState<PreviewRequest | null>(
+    null,
+  );
   const [errorTarget, setErrorTarget] = useState<KbDocument | null>(null);
   const errorSummary = useMemo(
     () => formatErrorSummary(errorTarget?.errorMessage),
@@ -185,6 +233,26 @@ const KnowledgeBasePage = () => {
   const [reindexingIds, setReindexingIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const handledPreviewQueryRef = useRef<string | null>(null);
+
+  const previewQuery = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const documentId = params.get('previewDocumentId');
+    if (!documentId) return null;
+    const startLine = parsePositiveInt(params.get('startLine'));
+    const endLine = parsePositiveInt(params.get('endLine')) ?? startLine;
+    return {
+      documentId,
+      startLine,
+      endLine,
+      key: `${documentId}:${startLine ?? ''}:${endLine ?? ''}`,
+    };
+  }, [location.search]);
+
+  const clearPreviewQuery = useCallback(() => {
+    if (!previewQuery) return;
+    navigate('/knowledge-base', { replace: true });
+  }, [navigate, previewQuery]);
 
   const folderChildren = useMemo(() => {
     const map = new Map<string, KbFolder[]>();
@@ -381,53 +449,88 @@ const KnowledgeBasePage = () => {
     [selection, uploadDocuments],
   );
 
-  const { loading: previewLoading, runAsync: previewDocument } = useRequest(
-    async (document: KbDocument) => {
+  const {
+    data: previewResult,
+    loading: previewLoading,
+    error: previewError,
+  } = useRequest(
+    async (): Promise<PreviewResult | null> => {
+      if (!previewRequest) return null;
+      const { document, lineTarget } = previewRequest;
       const data = await getDocumentPreview(document.id);
-      if (data.assets.length === 0) {
-        return { data, markdown: data.markdown };
+      let markdown = data.markdown;
+      if (data.assets.length > 0) {
+        const signed = await presignDocumentAssets(
+          document.id,
+          data.assets.map((asset) => asset.storageKey),
+        );
+        const replacements = new Map(
+          signed.items.map((item) => [item.assetKey, item.url]),
+        );
+        markdown = replaceAssetUrls(data.markdown, replacements);
       }
-      const signed = await presignDocumentAssets(
-        document.id,
-        data.assets.map((asset) => asset.storageKey),
-      );
-      const replacements = new Map(
-        signed.items.map((item) => [item.assetKey, item.url]),
-      );
       return {
         data,
-        markdown: replaceAssetUrls(data.markdown, replacements),
+        markdown,
+        lineTarget: lineTarget ?? null,
       };
     },
     {
-      manual: true,
-      onBefore: ([document]) => {
-        setPreviewError(null);
-        setPreviewMarkdown('');
-        setPreview({
-          documentId: document.id,
-          title: document.title,
-          markdown: '',
-          assets: [],
-        });
-      },
-      onSuccess: ({ data, markdown }) => {
-        setPreview(data);
-        setPreviewMarkdown(markdown);
-      },
-      onError: (error) => {
-        const message = error instanceof Error ? error.message : String(error);
-        setPreviewError(message);
-      },
+      ready: !!previewRequest,
+      refreshDeps: [
+        previewRequest?.document.id,
+        previewRequest?.lineTarget?.startLine,
+        previewRequest?.lineTarget?.endLine,
+      ],
     },
   );
 
+  const preview = previewRequest
+    ? (previewResult?.data ?? previewRequest.document)
+    : null;
+  const previewMarkdown = previewRequest ? (previewResult?.markdown ?? '') : '';
+  const previewLineTarget =
+    (previewRequest ? previewResult?.lineTarget : null) ??
+    previewRequest?.lineTarget ??
+    null;
+  const previewErrorMessage =
+    previewError instanceof Error ? previewError.message : undefined;
+  const previewLineExcerpt = useMemo(
+    () => buildLineExcerpt(previewMarkdown, previewLineTarget),
+    [previewLineTarget, previewMarkdown],
+  );
+
+  const openPreview = useCallback((request: PreviewRequest) => {
+    setPreviewRequest(request);
+  }, []);
+
   const handlePreview = useCallback(
     (document: KbDocument) => {
-      void previewDocument(document);
+      clearPreviewQuery();
+      openPreview({ document, lineTarget: null });
     },
-    [previewDocument],
+    [clearPreviewQuery, openPreview],
   );
+
+  useEffect(() => {
+    if (!previewQuery) return;
+    if (handledPreviewQueryRef.current === previewQuery.key) return;
+
+    handledPreviewQueryRef.current = previewQuery.key;
+    const lineTarget = previewQuery.startLine
+      ? {
+          startLine: previewQuery.startLine,
+          endLine: previewQuery.endLine ?? previewQuery.startLine,
+        }
+      : null;
+    openPreview({
+      document: {
+        id: previewQuery.documentId,
+        title: '加载文档预览',
+      },
+      lineTarget,
+    });
+  }, [openPreview, previewQuery]);
 
   const handleDeleteDocument = useCallback(
     async (document: KbDocument) => {
@@ -852,9 +955,8 @@ const KnowledgeBasePage = () => {
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => {
-                    setPreview(null);
-                    setPreviewMarkdown('');
-                    setPreviewError(null);
+                    setPreviewRequest(null);
+                    clearPreviewQuery();
                   }}
                 >
                   <Icon icon="lucide:x" className="size-4" />
@@ -865,15 +967,55 @@ const KnowledgeBasePage = () => {
               <Separator className="mb-4" />
               <div className="prose prose-sm max-h-[48vh] max-w-none overflow-y-auto dark:prose-invert">
                 {previewLoading && <p>加载中</p>}
-                {previewError && (
-                  <p className="text-destructive">{previewError}</p>
+                {previewErrorMessage && (
+                  <p className="text-destructive">{previewErrorMessage}</p>
                 )}
-                {!previewLoading && !previewError && (
-                  <div className="overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:px-3 [&_td]:py-2 [&_th]:border [&_th]:px-3 [&_th]:py-2 [&_th]:text-left">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {previewMarkdown}
-                    </ReactMarkdown>
-                  </div>
+                {!previewLoading && !previewErrorMessage && (
+                  <>
+                    {previewLineTarget && (
+                      <div className="not-prose mb-4 rounded-md border border-teal-200 bg-teal-50/80 p-3 text-xs dark:border-teal-800 dark:bg-teal-950/30">
+                        <div className="mb-2 flex items-center gap-2 font-medium text-teal-800 dark:text-teal-200">
+                          <Icon icon="lucide:map-pin" className="size-3.5" />
+                          定位到第 {previewLineTarget.startLine}
+                          {previewLineTarget.endLine !==
+                          previewLineTarget.startLine
+                            ? `-${previewLineTarget.endLine}`
+                            : ''}{' '}
+                          行
+                        </div>
+                        <div className="max-h-64 overflow-y-auto rounded border bg-background font-mono text-[11px] leading-relaxed">
+                          {previewLineExcerpt.length > 0 ? (
+                            previewLineExcerpt.map((line) => (
+                              <div
+                                key={line.lineNumber}
+                                className={cn(
+                                  'grid grid-cols-[3rem_1fr] gap-3 px-2 py-0.5',
+                                  line.active &&
+                                    'bg-amber-100 text-amber-950 dark:bg-amber-500/20 dark:text-amber-100',
+                                )}
+                              >
+                                <span className="select-none text-right text-muted-foreground">
+                                  {line.lineNumber}
+                                </span>
+                                <span className="whitespace-pre-wrap break-words">
+                                  {line.text || ' '}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-muted-foreground">
+                              未找到对应行内容
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    <div className="overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:px-3 [&_td]:py-2 [&_th]:border [&_th]:px-3 [&_th]:py-2 [&_th]:text-left">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {previewMarkdown}
+                      </ReactMarkdown>
+                    </div>
+                  </>
                 )}
               </div>
             </CardContent>

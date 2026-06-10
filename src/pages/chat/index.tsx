@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { smallUpload } from '@/api/files';
 import type {
   ChatSession,
+  QaCitation,
   QaPhase,
   QaStreamEvent,
   QaStreamResponse,
@@ -122,6 +123,22 @@ const KbChat = () => {
     {
       refreshDeps: [selectedLibraryId],
     },
+  );
+
+  const openCitationPreview = useCallback(
+    (citation: QaCitation) => {
+      const params = new URLSearchParams({
+        previewDocumentId: citation.documentId,
+      });
+      if (citation.startLine) {
+        params.set('startLine', String(citation.startLine));
+      }
+      if (citation.endLine) {
+        params.set('endLine', String(citation.endLine));
+      }
+      navigate(`/knowledge-base?${params.toString()}`);
+    },
+    [navigate],
   );
 
   // --- Sessions loading ---
@@ -1059,7 +1076,12 @@ const KbChat = () => {
                   />
                 )}
                 {round.aiMsg && (
-                  <AiMessage msg={round.aiMsg} t={t} labels={toolCallLabels} />
+                  <AiMessage
+                    msg={round.aiMsg}
+                    t={t}
+                    labels={toolCallLabels}
+                    onOpenCitation={openCitationPreview}
+                  />
                 )}
               </div>
             );

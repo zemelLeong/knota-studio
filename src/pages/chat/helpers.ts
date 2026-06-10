@@ -24,6 +24,21 @@ export const createToolCallLabels = (t: TFn): Record<string, string> => ({
   search_material: t('KbChat.tool.searchMaterial', '搜索材料'),
   // biome-ignore lint/style/useNamingConvention: key matches server tool name
   search_knowledge_base: t('KbChat.tool.searchKb', '搜索知识库'),
+  // biome-ignore lint/style/useNamingConvention: key matches server tool name
+  read_knowledge_base_lines: t(
+    'KbChat.tool.readKnowledgeBaseLines',
+    '读取知识库原文',
+  ),
+  // biome-ignore lint/style/useNamingConvention: key matches server tool name
+  list_knowledge_base_documents: t(
+    'KbChat.tool.listKnowledgeBaseDocuments',
+    '查看知识库文档',
+  ),
+  // biome-ignore lint/style/useNamingConvention: key matches server tool name
+  list_knowledge_base_scope: t(
+    'KbChat.tool.listKnowledgeBaseScope',
+    '查看知识库范围',
+  ),
   // biome-ignore lint/style/useNamingConvention: key matches page tool name
   page_list_actions: t('KbChat.tool.pageListActions', '浏览页面操作'),
   // biome-ignore lint/style/useNamingConvention: key matches page tool name

@@ -27,6 +27,10 @@ export interface QaRequest {
 export interface QaCitation {
   documentId: string;
   chunkId?: string;
+  documentTitle?: string | null;
+  headingPath?: string | null;
+  startLine?: number | null;
+  endLine?: number | null;
   content: string;
   score: number;
 }

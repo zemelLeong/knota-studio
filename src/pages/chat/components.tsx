@@ -277,34 +277,67 @@ export const AiMessage = memo(
               {t('KbChat.citations.title', '引用来源')}
             </div>
             <div className="space-y-1.5">
-              {msg.citations.slice(0, 5).map((citation, idx) => (
-                <div
-                  key={`${citation.documentId}-${citation.chunkId ?? idx}`}
-                  className="rounded border bg-background/70 px-2 py-1.5 text-xs"
-                >
-                  <div className="flex flex-wrap items-center gap-1.5 text-muted-foreground">
-                    <span className="font-mono">
-                      {t('KbChat.citations.document', '文档')}:{' '}
-                      {citation.documentId.slice(0, 8)}
-                    </span>
-                    {citation.chunkId && (
-                      <span className="font-mono">
-                        {t('KbChat.citations.chunk', '分块')}:{' '}
-                        {citation.chunkId.slice(0, 8)}
-                      </span>
-                    )}
-                    <span>
-                      {t('KbChat.citations.score', '相关度')}:{' '}
-                      {citation.score.toFixed(2)}
-                    </span>
-                  </div>
-                  {citation.content && (
-                    <div className="mt-1 line-clamp-2 text-muted-foreground">
-                      {citation.content}
+              {msg.citations.slice(0, 5).map((citation, idx) => {
+                const locationLabel = formatCitationLocation(citation);
+                const preview = shouldShowCitationPreview(citation)
+                  ? citation.content
+                  : undefined;
+
+                return (
+                  <div
+                    key={`${citation.documentId}-${citation.chunkId ?? idx}`}
+                    className="rounded border bg-background/70 px-2.5 py-2 text-xs"
+                  >
+                    <div className="flex min-w-0 items-start gap-2">
+                      <Icon
+                        icon="lucide:file-text"
+                        className="mt-0.5 size-3.5 shrink-0 text-teal-600 dark:text-teal-400"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium text-foreground">
+                          {citation.documentTitle
+                            ? `《${citation.documentTitle}》`
+                            : (citation.headingPath ??
+                              t(
+                                'KbChat.citations.unknownDocument',
+                                '未知文档',
+                              ))}
+                        </div>
+                        {citation.headingPath && citation.documentTitle && (
+                          <div className="mt-0.5 truncate text-muted-foreground">
+                            {citation.headingPath}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-muted-foreground">
+                      <span className="inline-flex items-center gap-1 rounded bg-teal-50 px-1.5 py-0.5 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300">
+                        <Icon icon="lucide:map-pin" className="size-3" />
+                        {locationLabel}
+                      </span>
+                      <span className="font-mono">
+                        {t('KbChat.citations.document', '文档')}:{' '}
+                        {citation.documentId.slice(0, 8)}
+                      </span>
+                      {citation.chunkId && (
+                        <span className="font-mono">
+                          {t('KbChat.citations.chunk', '分块')}:{' '}
+                          {citation.chunkId.slice(0, 8)}
+                        </span>
+                      )}
+                      <span className="font-mono">
+                        {t('KbChat.citations.score', '相关度')}:{' '}
+                        {citation.score.toFixed(2)}
+                      </span>
+                    </div>
+                    {preview && (
+                      <div className="mt-1.5 line-clamp-2 text-muted-foreground">
+                        {preview}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -433,4 +466,24 @@ const formatDuration = (durationMs: number | undefined) => {
   return durationMs < 1000
     ? `${durationMs}ms`
     : `${(durationMs / 1000).toFixed(1)}s`;
+};
+
+const formatCitationLocation = (citation: {
+  startLine?: number | null;
+  endLine?: number | null;
+}) => {
+  if (!citation.startLine) return '位置未知';
+  if (!citation.endLine || citation.endLine === citation.startLine) {
+    return `第 ${citation.startLine} 行`;
+  }
+  return `第 ${citation.startLine}-${citation.endLine} 行`;
+};
+
+const shouldShowCitationPreview = (citation: {
+  content?: string | null;
+  headingPath?: string | null;
+}) => {
+  const content = citation.content?.trim();
+  if (!content) return false;
+  return content !== citation.headingPath?.trim();
 };

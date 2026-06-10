@@ -85,6 +85,31 @@ const extractQuotedField = (message: string, field: string) => {
   return match?.[1];
 };
 
+const errorStageLabel = (message?: string | null) => {
+  if (!message) return '未知阶段';
+  if (
+    message.includes('文件内容类型') ||
+    message.includes('文件名后缀') ||
+    message.includes('不支持的文件格式') ||
+    message.includes('no parser found')
+  ) {
+    return '格式校验';
+  }
+  if (message.includes('MinerU returned HTTP') || message.includes('解析')) {
+    return '文档解析';
+  }
+  if (message.includes('嵌入生成失败') || message.includes('embedding')) {
+    return '向量生成';
+  }
+  if (message.includes('Qdrant') || message.includes('vector')) {
+    return '向量写入';
+  }
+  if (message.includes('storage') || message.includes('S3')) {
+    return '文件读取';
+  }
+  return '入库处理';
+};
+
 const formatErrorSummary = (message?: string | null) => {
   if (!message) return null;
 
@@ -95,6 +120,7 @@ const formatErrorSummary = (message?: string | null) => {
 
   if (detectedMime && (declaredMime || extensionMime)) {
     return {
+      stage: errorStageLabel(message),
       title: '文件类型不一致',
       description:
         '文件内容、上传声明或文件名后缀不一致。请确认文件没有被错误改名后重新上传。',
@@ -109,6 +135,7 @@ const formatErrorSummary = (message?: string | null) => {
 
   if (message.includes('MinerU returned HTTP')) {
     return {
+      stage: errorStageLabel(message),
       title: '文档解析服务返回错误',
       description:
         '解析服务未能处理该文件。请检查文件格式是否受支持，或查看原始错误定位解析服务返回内容。',
@@ -118,6 +145,7 @@ const formatErrorSummary = (message?: string | null) => {
 
   if (message.includes('嵌入生成失败') || message.includes('embedding')) {
     return {
+      stage: errorStageLabel(message),
       title: '向量生成失败',
       description: 'Embedding 服务不可用或请求失败，请检查向量模型服务状态。',
       details: [],
@@ -329,6 +357,11 @@ const KnowledgeBasePage = () => {
     }
     return stats;
   }, [documents]);
+
+  const failedDocuments = useMemo(
+    () => documents.filter((document) => document.status === 'error'),
+    [documents],
+  );
 
   const { loading, runAsync: loadDocuments } = useRequest(
     async () => {
@@ -783,6 +816,69 @@ const KnowledgeBasePage = () => {
                 </span>
               )}
             </div>
+            {failedDocuments.length > 0 && (
+              <div className="mb-3 rounded-md border border-red-200 bg-red-50/70 p-3 dark:border-red-900/70 dark:bg-red-950/30">
+                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-300">
+                  <Icon icon="lucide:circle-alert" className="size-4" />
+                  {failedDocuments.length} 个文档入库失败
+                </div>
+                <div className="space-y-2">
+                  {failedDocuments.slice(0, 3).map((document) => {
+                    const summary = formatErrorSummary(document.errorMessage);
+                    return (
+                      <div
+                        key={document.id}
+                        className="flex items-start justify-between gap-3 rounded border bg-background/80 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium">
+                            {document.title}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span className="rounded bg-muted px-1.5 py-0.5">
+                              {summary?.stage ??
+                                errorStageLabel(document.errorMessage)}
+                            </span>
+                            <span className="max-w-[32rem] truncate">
+                              {summary?.title ??
+                                document.errorMessage ??
+                                '入库失败'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            onClick={() => setErrorTarget(document)}
+                          >
+                            详情
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="xs"
+                            disabled={reindexingIds.has(document.id)}
+                            onClick={() => void handleReindex(document)}
+                          >
+                            {reindexingIds.has(document.id)
+                              ? '提交中'
+                              : '重新入库'}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {failedDocuments.length > 3 && (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    还有 {failedDocuments.length - 3}{' '}
+                    个失败文档，请在列表中查看。
+                  </div>
+                )}
+              </div>
+            )}
             <div className="overflow-hidden rounded-md border">
               <table className="w-full table-fixed text-sm">
                 <thead className="bg-muted/60 text-left">

@@ -60,6 +60,15 @@ export interface KbFolder {
   updatedAt: string;
 }
 
+export interface IndexingProgress {
+  stage: string;
+  label: string;
+  message?: string | null;
+  current?: number | null;
+  total?: number | null;
+  stageStartedAt?: string | null;
+}
+
 export interface KbDocument {
   id: string;
   title: string;
@@ -72,6 +81,7 @@ export interface KbDocument {
   status: string;
   chunkCount: number;
   totalTokens: number;
+  indexingProgress?: IndexingProgress | null;
   errorMessage?: string | null;
   createdAt: string;
   updatedAt: string;

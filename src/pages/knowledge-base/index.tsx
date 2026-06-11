@@ -155,6 +155,34 @@ const formatErrorSummary = (message?: string | null) => {
   return null;
 };
 
+const documentProgressLabel = (document: KbDocument) => {
+  if (document.status === 'error' && document.indexingProgress?.label) {
+    return `失败于：${document.indexingProgress.label}`;
+  }
+  if (document.status === 'indexing' && document.indexingProgress?.label) {
+    return `入库中：${document.indexingProgress.label}`;
+  }
+  if (document.status === 'pending' && document.indexingProgress?.label) {
+    return document.indexingProgress.label;
+  }
+  return null;
+};
+
+const documentProgressMessage = (document: KbDocument) =>
+  document.indexingProgress?.message ??
+  documentProgressLabel(document) ??
+  statusMeta(document.status).description;
+
+const documentProgressPercent = (document: KbDocument) => {
+  const current = document.indexingProgress?.current;
+  const total = document.indexingProgress?.total;
+  if (typeof current !== 'number' || typeof total !== 'number' || total <= 0) {
+    return null;
+  }
+
+  return Math.min(100, Math.max(0, Math.round((current / total) * 100)));
+};
+
 const statusVariant = (status: string) => {
   if (status === 'ready') return 'default';
   if (status === 'error') return 'destructive';
@@ -825,6 +853,10 @@ const KnowledgeBasePage = () => {
                 <div className="space-y-2">
                   {failedDocuments.slice(0, 3).map((document) => {
                     const summary = formatErrorSummary(document.errorMessage);
+                    const stageLabel =
+                      document.indexingProgress?.label ??
+                      summary?.stage ??
+                      errorStageLabel(document.errorMessage);
                     return (
                       <div
                         key={document.id}
@@ -836,8 +868,7 @@ const KnowledgeBasePage = () => {
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             <span className="rounded bg-muted px-1.5 py-0.5">
-                              {summary?.stage ??
-                                errorStageLabel(document.errorMessage)}
+                              {stageLabel}
                             </span>
                             <span className="max-w-[32rem] truncate">
                               {summary?.title ??
@@ -903,6 +934,7 @@ const KnowledgeBasePage = () => {
                       document.status,
                     );
                     const isReindexing = reindexingIds.has(document.id);
+                    const progressPercent = documentProgressPercent(document);
                     return (
                       <tr key={document.id} className="border-t">
                         <td className="min-w-0 px-3 py-2">
@@ -917,7 +949,7 @@ const KnowledgeBasePage = () => {
                               </div>
                               <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                                 <span className="truncate">
-                                  {meta.description}
+                                  {documentProgressMessage(document)}
                                 </span>
                                 {document.errorMessage && (
                                   <button
@@ -929,6 +961,19 @@ const KnowledgeBasePage = () => {
                                   </button>
                                 )}
                               </div>
+                              {progressPercent !== null && isProcessing && (
+                                <div className="mt-1 flex items-center gap-2">
+                                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                                    <div
+                                      className="h-full rounded-full bg-blue-500 transition-all"
+                                      style={{ width: `${progressPercent}%` }}
+                                    />
+                                  </div>
+                                  <span className="w-10 text-right text-[11px] text-muted-foreground">
+                                    {progressPercent}%
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -1130,6 +1175,26 @@ const KnowledgeBasePage = () => {
             <DialogTitle>{errorTarget?.title ?? '错误详情'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            {errorTarget?.indexingProgress && (
+              <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                <div className="font-medium">
+                  失败阶段：{errorTarget.indexingProgress.label}
+                </div>
+                {errorTarget.indexingProgress.message && (
+                  <div className="mt-1 text-muted-foreground">
+                    {errorTarget.indexingProgress.message}
+                  </div>
+                )}
+                {errorTarget.indexingProgress.stageStartedAt && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    阶段开始：
+                    {new Date(
+                      errorTarget.indexingProgress.stageStartedAt,
+                    ).toLocaleString()}
+                  </div>
+                )}
+              </div>
+            )}
             {errorSummary && (
               <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
                 <div className="text-sm font-medium text-destructive">

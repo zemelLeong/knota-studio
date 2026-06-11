@@ -116,9 +116,14 @@ export interface ProTableProps<TData, TValue = unknown> {
   getSubRows?: (row: TData) => TData[] | undefined;
 }
 
+export interface ProTableRefreshOptions {
+  /** Refresh data without showing table loading state. */
+  silent?: boolean;
+}
+
 export interface ProTableRef {
   /** Refresh table data with current page, page size, search params, and extra params. */
-  refresh: () => void;
+  refresh: (options?: ProTableRefreshOptions) => void;
 }
 
 /**

@@ -55,6 +55,7 @@ const ProTableImpl = <TData, TValue = unknown>(
 
   /** Track previous searchParams to detect changes. */
   const prevSearchRef = useRef(searchParams);
+  const silentRefreshingRef = useRef(false);
 
   const noopRequest = useCallback(async () => [] as TData[], []);
 
@@ -88,22 +89,37 @@ const ProTableImpl = <TData, TValue = unknown>(
     data: reqData,
     loading: reqLoading,
     refresh,
+    mutate,
   } = useRequest(mergedRequest, {
     refreshDeps: [page, pageSize, searchParams, extraParams, sorting],
     manual: isStaticMode,
   });
   const loading = isStaticMode ? false : reqLoading;
 
+  const silentRefresh = useCallback(async () => {
+    if (isStaticMode || silentRefreshingRef.current) return;
+    silentRefreshingRef.current = true;
+    try {
+      mutate(await mergedRequest());
+    } finally {
+      silentRefreshingRef.current = false;
+    }
+  }, [isStaticMode, mergedRequest, mutate]);
+
   useImperativeHandle(
     ref,
     () => ({
-      refresh: () => {
+      refresh: (options) => {
         if (!isStaticMode) {
+          if (options?.silent) {
+            void silentRefresh();
+            return;
+          }
           refresh();
         }
       },
     }),
-    [isStaticMode, refresh],
+    [isStaticMode, refresh, silentRefresh],
   );
 
   const handleSearch = useCallback((values: Record<string, unknown>) => {

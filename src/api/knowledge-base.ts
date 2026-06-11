@@ -85,6 +85,7 @@ export interface KbDocument {
   errorMessage?: string | null;
   createdAt: string;
   updatedAt: string;
+  reusedExisting?: boolean;
 }
 
 export interface CreateLibraryRequest {

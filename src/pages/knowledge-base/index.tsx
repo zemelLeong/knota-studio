@@ -515,7 +515,7 @@ const KnowledgeBasePage = () => {
   useEffect(() => {
     if (!hasIndexingDocuments) return;
     const timer = window.setInterval(() => {
-      tableRef.current?.refresh();
+      tableRef.current?.refresh({ silent: true });
     }, 3000);
     return () => window.clearInterval(timer);
   }, [hasIndexingDocuments]);
@@ -553,6 +553,8 @@ const KnowledgeBasePage = () => {
   const { loading: uploading, runAsync: uploadDocuments } = useRequest(
     async (files: FileList) => {
       if (!selection) return;
+      let createdCount = 0;
+      let reusedCount = 0;
       for (const file of Array.from(files)) {
         const mimeType = inferSupportedUploadMime(file);
         if (!mimeType) {
@@ -561,7 +563,7 @@ const KnowledgeBasePage = () => {
         const uploaded = await uploadFile(file, {
           mimeTypeHint: mimeType,
         });
-        await createDocument({
+        const document = await createDocument({
           title: file.name,
           libraryId: selection.libraryId,
           folderId: selection.folderId,
@@ -569,12 +571,27 @@ const KnowledgeBasePage = () => {
           sourceType: mimeType,
           scope: 'tenant',
         });
+        if (document.reusedExisting) {
+          reusedCount += 1;
+        } else {
+          createdCount += 1;
+        }
       }
+      return { createdCount, reusedCount };
     },
     {
       manual: true,
-      onSuccess: () => {
-        toast.success('已提交入库任务');
+      onSuccess: (result) => {
+        if (!result) return;
+        if (result.createdCount > 0 && result.reusedCount > 0) {
+          toast.success(
+            `已提交 ${result.createdCount} 个入库任务，跳过 ${result.reusedCount} 个重复文档`,
+          );
+        } else if (result.createdCount > 0) {
+          toast.success(`已提交 ${result.createdCount} 个入库任务`);
+        } else if (result.reusedCount > 0) {
+          toast.success(`已跳过 ${result.reusedCount} 个重复文档`);
+        }
         tableRef.current?.refresh();
       },
       onError: (error) => {
@@ -893,6 +910,7 @@ const KnowledgeBasePage = () => {
           <SidebarMenuSubButton asChild isActive={selected}>
             <button
               type="button"
+              className="w-full justify-start"
               style={depth > 0 ? { paddingLeft: 8 + depth * 12 } : undefined}
               onClick={() =>
                 setSelection({
@@ -989,210 +1007,214 @@ const KnowledgeBasePage = () => {
         </Sidebar>
       </SidebarProvider>
 
-      <main className="flex min-w-0 flex-1 flex-col gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between gap-3 text-base">
-              <span className="truncate">
-                {selectedFolder?.name ?? selectedLibrary?.name ?? '知识库文档'}
-              </span>
-              <div className="flex shrink-0 items-center gap-2">
-                <Input
-                  value={folderName}
-                  placeholder="新建目录"
-                  className="h-9 w-40"
-                  disabled={!selection}
-                  onChange={(event) => setFolderName(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') void handleCreateFolder();
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!selection}
-                  onClick={handleCreateFolder}
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {!preview && (
+          <Card className="flex min-h-0 flex-1 flex-col">
+            <CardHeader className="shrink-0 pb-3">
+              <CardTitle className="flex items-center justify-between gap-3 text-base">
+                <span className="truncate">
+                  {selectedFolder?.name ??
+                    selectedLibrary?.name ??
+                    '知识库文档'}
+                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Input
+                    value={folderName}
+                    placeholder="新建目录"
+                    className="h-9 w-40"
+                    disabled={!selection}
+                    onChange={(event) => setFolderName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') void handleCreateFolder();
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!selection}
+                    onClick={handleCreateFolder}
+                  >
+                    <Icon icon="lucide:folder-plus" className="mr-2 size-4" />
+                    新建目录
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void refreshAll()}
+                  >
+                    <Icon
+                      icon="lucide:refresh-cw"
+                      className={
+                        hasIndexingDocuments
+                          ? 'mr-2 size-4 animate-spin'
+                          : 'mr-2 size-4'
+                      }
+                    />
+                    {hasIndexingDocuments ? '刷新中' : '刷新'}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!selection || uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Icon icon="lucide:upload" className="mr-2 size-4" />
+                    上传入库
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={supportedUploadAccept}
+                    multiple
+                    className="hidden"
+                    onChange={(event) => void handleUpload(event.target.files)}
+                  />
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex min-h-0 flex-1 flex-col">
+              <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1 rounded-md border bg-muted/40 px-2 py-1">
+                  <Icon icon="lucide:files" className="size-3.5" />
+                  当前页 {documentStats.total} 个
+                </span>
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-md border px-2 py-1',
+                    statusMeta('pending').tone,
+                  )}
                 >
-                  <Icon icon="lucide:folder-plus" className="mr-2 size-4" />
-                  新建目录
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void refreshAll()}
+                  <Icon icon="lucide:clock-3" className="size-3.5" />
+                  等待 {documentStats.pending}
+                </span>
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-md border px-2 py-1',
+                    statusMeta('indexing').tone,
+                  )}
                 >
                   <Icon
-                    icon="lucide:refresh-cw"
-                    className={
-                      hasIndexingDocuments
-                        ? 'mr-2 size-4 animate-spin'
-                        : 'mr-2 size-4'
-                    }
+                    icon="lucide:loader-2"
+                    className={cn(
+                      'size-3.5',
+                      hasIndexingDocuments && 'animate-spin',
+                    )}
                   />
-                  {hasIndexingDocuments ? '刷新中' : '刷新'}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={!selection || uploading}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Icon icon="lucide:upload" className="mr-2 size-4" />
-                  上传入库
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={supportedUploadAccept}
-                  multiple
-                  className="hidden"
-                  onChange={(event) => void handleUpload(event.target.files)}
-                />
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1 rounded-md border bg-muted/40 px-2 py-1">
-                <Icon icon="lucide:files" className="size-3.5" />
-                当前页 {documentStats.total} 个
-              </span>
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-md border px-2 py-1',
-                  statusMeta('pending').tone,
-                )}
-              >
-                <Icon icon="lucide:clock-3" className="size-3.5" />
-                等待 {documentStats.pending}
-              </span>
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-md border px-2 py-1',
-                  statusMeta('indexing').tone,
-                )}
-              >
-                <Icon
-                  icon="lucide:loader-2"
-                  className={cn(
-                    'size-3.5',
-                    hasIndexingDocuments && 'animate-spin',
-                  )}
-                />
-                入库中 {documentStats.indexing}
-              </span>
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-md border px-2 py-1',
-                  statusMeta('ready').tone,
-                )}
-              >
-                <Icon icon="lucide:check-circle-2" className="size-3.5" />
-                可用 {documentStats.ready}
-              </span>
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-md border px-2 py-1',
-                  statusMeta('error').tone,
-                )}
-              >
-                <Icon icon="lucide:circle-alert" className="size-3.5" />
-                失败 {documentStats.error}
-              </span>
-              {hasIndexingDocuments && (
-                <span className="text-[11px]">
-                  检测到入库任务，页面会自动刷新状态
+                  入库中 {documentStats.indexing}
                 </span>
-              )}
-            </div>
-            {failedDocuments.length > 0 && (
-              <div className="mb-3 rounded-md border border-red-200 bg-red-50/70 p-3 dark:border-red-900/70 dark:bg-red-950/30">
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-300">
-                  <Icon icon="lucide:circle-alert" className="size-4" />
-                  {failedDocuments.length} 个文档入库失败
-                </div>
-                <div className="space-y-2">
-                  {failedDocuments.slice(0, 3).map((document) => {
-                    const summary = formatErrorSummary(document.errorMessage);
-                    const stageLabel =
-                      document.indexingProgress?.label ??
-                      summary?.stage ??
-                      errorStageLabel(document.errorMessage);
-                    return (
-                      <div
-                        key={document.id}
-                        className="flex items-start justify-between gap-3 rounded border bg-background/80 px-3 py-2"
-                      >
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-medium">
-                            {document.title}
-                          </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <span className="rounded bg-muted px-1.5 py-0.5">
-                              {stageLabel}
-                            </span>
-                            <span className="max-w-[32rem] truncate">
-                              {summary?.title ??
-                                document.errorMessage ??
-                                '入库失败'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="xs"
-                            onClick={() => setErrorTarget(document)}
-                          >
-                            详情
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="xs"
-                            disabled={reindexingIds.has(document.id)}
-                            onClick={() => void handleReindex(document)}
-                          >
-                            {reindexingIds.has(document.id)
-                              ? '提交中'
-                              : '重新入库'}
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {failedDocuments.length > 3 && (
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    还有 {failedDocuments.length - 3}{' '}
-                    个失败文档，请在列表中查看。
-                  </div>
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-md border px-2 py-1',
+                    statusMeta('ready').tone,
+                  )}
+                >
+                  <Icon icon="lucide:check-circle-2" className="size-3.5" />
+                  可用 {documentStats.ready}
+                </span>
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-md border px-2 py-1',
+                    statusMeta('error').tone,
+                  )}
+                >
+                  <Icon icon="lucide:circle-alert" className="size-3.5" />
+                  失败 {documentStats.error}
+                </span>
+                {hasIndexingDocuments && (
+                  <span className="text-[11px]">
+                    检测到入库任务，页面会自动刷新状态
+                  </span>
                 )}
               </div>
-            )}
-            <div className="min-h-[24rem]">
-              <ProTable<KbDocument>
-                ref={tableRef}
-                columns={documentColumns}
-                request={loadDocuments}
-                params={documentTableParams}
-                search={false}
-                refreshable
-                pagination={{
-                  defaultPageSize: 30,
-                  pageSizeOptions: [10, 20, 30, 50, 100],
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
+              {failedDocuments.length > 0 && (
+                <div className="mb-3 rounded-md border border-red-200 bg-red-50/70 p-3 dark:border-red-900/70 dark:bg-red-950/30">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-300">
+                    <Icon icon="lucide:circle-alert" className="size-4" />
+                    {failedDocuments.length} 个文档入库失败
+                  </div>
+                  <div className="space-y-2">
+                    {failedDocuments.slice(0, 3).map((document) => {
+                      const summary = formatErrorSummary(document.errorMessage);
+                      const stageLabel =
+                        document.indexingProgress?.label ??
+                        summary?.stage ??
+                        errorStageLabel(document.errorMessage);
+                      return (
+                        <div
+                          key={document.id}
+                          className="flex items-start justify-between gap-3 rounded border bg-background/80 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium">
+                              {document.title}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              <span className="rounded bg-muted px-1.5 py-0.5">
+                                {stageLabel}
+                              </span>
+                              <span className="max-w-[32rem] truncate">
+                                {summary?.title ??
+                                  document.errorMessage ??
+                                  '入库失败'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => setErrorTarget(document)}
+                            >
+                              详情
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="xs"
+                              disabled={reindexingIds.has(document.id)}
+                              onClick={() => void handleReindex(document)}
+                            >
+                              {reindexingIds.has(document.id)
+                                ? '提交中'
+                                : '重新入库'}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {failedDocuments.length > 3 && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      还有 {failedDocuments.length - 3}{' '}
+                      个失败文档，请在列表中查看。
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="min-h-0 flex-1">
+                <ProTable<KbDocument>
+                  ref={tableRef}
+                  columns={documentColumns}
+                  request={loadDocuments}
+                  params={documentTableParams}
+                  search={false}
+                  refreshable
+                  pagination={{
+                    defaultPageSize: 30,
+                    pageSizeOptions: [10, 20, 30, 50, 100],
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {preview && (
-          <Card className="min-h-0 flex-1">
-            <CardHeader className="pb-3">
+          <Card className="flex min-h-0 flex-1 flex-col">
+            <CardHeader className="shrink-0 pb-3">
               <CardTitle className="flex items-center justify-between gap-3 text-base">
                 <span className="truncate">{preview.title}</span>
                 <Button
@@ -1208,9 +1230,9 @@ const KnowledgeBasePage = () => {
                 </Button>
               </CardTitle>
             </CardHeader>
-            <CardContent className="min-h-0">
-              <Separator className="mb-4" />
-              <div className="prose prose-sm max-h-[48vh] max-w-none overflow-y-auto dark:prose-invert">
+            <CardContent className="flex min-h-0 flex-1 flex-col">
+              <Separator className="mb-4 shrink-0" />
+              <div className="prose prose-sm min-h-0 max-w-none flex-1 overflow-y-auto dark:prose-invert">
                 {previewLoading && <p>加载中</p>}
                 {previewErrorMessage && (
                   <p className="text-destructive">{previewErrorMessage}</p>
